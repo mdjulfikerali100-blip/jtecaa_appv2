@@ -1,0 +1,55 @@
+name: jtecaa_app
+description: JTECAA Alumni Association — Textile Engineering Alumni Network
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.3.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  # Firebase
+  # ⚠️ firebase_storage is INTENTIONALLY excluded (Architecture §5.4) —
+  # profile/news images go through Google Drive + Apps Script instead,
+  # so there is zero Firebase Storage cost/quota usage.
+  firebase_core: ^3.0.0
+  firebase_auth: ^5.0.0
+  cloud_firestore: ^5.0.0
+  firebase_messaging: ^15.0.0
+
+  # State Management (Architecture §1 "Repository + CQRS" uses Riverpod
+  # StateNotifier/FutureProvider throughout every provider file)
+  flutter_riverpod: ^2.5.0
+
+  # Local Cache — Tier 2 of the 4-Tier Cache Pyramid (Architecture §6.2)
+  hive: ^2.2.3
+  hive_flutter: ^1.1.0
+
+  # UI
+  cached_network_image: ^3.3.1
+  google_fonts: ^6.2.0     # Playfair Display + Inter (Appendix F.3)
+  shimmer: ^3.0.0          # Skeleton loading (Appendix F.6.N)
+  url_launcher: ^6.2.0     # tel:/https:/wa.me launching (Appendix B.1)
+
+  # Network — Google Sheets Proxy (Jobs/News/Students, §5 + §M.4)
+  http: ^1.2.0
+
+  # Utils
+  intl: ^0.19.0                      # DateFormat for Work Experience (Appendix A)
+  image_picker: ^1.1.0               # Profile photo picking (Appendix J.5)
+  flutter_image_compress: ^2.3.0     # Compress to ≤300KB before Drive upload
+  path_provider: ^2.1.0
+  connectivity_plus: ^6.0.0          # Network status for offline-first UX
+  workmanager: ^0.5.0                # Background sync / cache purge (§H.2)
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  hive_generator: ^2.0.1
+  build_runner: ^2.4.0
+  flutter_lints: ^4.0.0
+
+flutter:
+  uses-material-design: true
