@@ -51,7 +51,7 @@ class AlumniIdValidator {
     final match = _pattern.firstMatch(id);
     if (match == null) {
       return AlumniIdValidationResult.invalid(
-        'Invalid ID format — must be "jtec" + 8 uppercase letters + "alumni"',
+        'Invalid ID format".',
       );
     }
 
@@ -66,7 +66,8 @@ class AlumniIdValidator {
     final computedBatchNumber = (characterSum + 7533) % 200;
 
     if (computedBatchNumber != batchNumber) {
-      return AlumniIdValidationResult.invalid('Invalid ID — batch mismatch');
+      return AlumniIdValidationResult.invalid(
+          'Invalid ID Please correct your ID from the JTEACC.');
     }
 
     return AlumniIdValidationResult.valid();

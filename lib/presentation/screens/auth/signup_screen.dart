@@ -249,7 +249,7 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
                 decoration: InputDecoration(
                   labelText: isAlumni ? 'Alumni ID' : 'Student ID',
                   hintText:
-                      isAlumni ? 'jtecAAAAAKZZalumni' : 'jtecABCDEFGHstudent',
+                      isAlumni ? 'jtec..........alumni' : 'jtec........student',
                   prefixIcon: const Icon(Icons.badge_outlined),
                 ),
                 validator: (v) =>

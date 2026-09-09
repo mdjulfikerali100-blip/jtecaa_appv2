@@ -3,13 +3,13 @@
 // Architecture Appendix G.3 — Career Status dropdown, Donut Chart segment
 // colors, and short labels.
 //
-// ⚠️ `getDropdownItems()` below already applies the Appendix K.3 overflow
-// fix from day one: the longest label ("Preparing for a Government Job")
-// plus a 12px color dot can exceed a narrow real device's dropdown-field
-// width. Wrapping the text in Expanded + ellipsis + maxLines:1 prevents
-// the "BOTTOM OVERFLOWED BY 31 PIXELS" error this exact widget caused on
-// the Signup/Profile-Edit screens before the fix — building it correctly
-// here means every screen that reuses this list is safe automatically.
+// ⚠️ `getDropdownItems()` below applies the Appendix K.3 overflow fix:
+// the longest label ("Preparing for a Government Job") plus a color dot
+// can exceed a narrow real device's dropdown-field width. Using
+// Flexible (not Expanded) + ellipsis + maxLines:1 prevents the
+// "BOTTOM OVERFLOWED" error and the "unbounded width constraints"
+// assertion that happens when a DropdownMenuItem is rendered inside
+// an InputDecorator with unbounded horizontal space.
 
 import 'package:flutter/material.dart';
 
@@ -64,9 +64,12 @@ class CareerStatusCategories {
               ),
             ),
             const SizedBox(width: 8),
-            // ⚠️ Appendix K.3 pattern: Expanded + ellipsis + maxLines:1 so
-            // the longest category label never overflows a narrow field.
-            Expanded(
+            // ⚠️ CRITICAL FIX: Expanded → Flexible
+            // Expanded forces the child to take all remaining space,
+            // which conflicts with unbounded width constraints in dropdowns.
+            // Flexible allows the child to size itself to its content,
+            // preventing the "unbounded width" assertion error.
+            Flexible(
               child: Text(
                 category,
                 maxLines: 1,

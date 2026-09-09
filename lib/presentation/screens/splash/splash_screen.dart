@@ -130,9 +130,9 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
     final roleAsync = ref.read(myRoleProvider);
     if (roleAsync.isLoading) return; // wait for roles/{uid} to resolve
     final role = roleAsync.valueOrNull;
-    if (role == null)
+    if (role == null) {
       return; // still resolving or an error state — stay on splash
-
+    }
     if (role == SignupRole.student) {
       _navigateOnce(const StudentShell());
     } else {
