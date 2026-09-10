@@ -33,7 +33,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   }
 
   Future<void> _submit() async {
-    if (!_formKey.currentState!.validate()) return;
+    if (!_formKey.currentState!.validate()) {
+      return;
+    }
     setState(() => _isSubmitting = true);
 
     final success = await ref.read(authControllerProvider.notifier).signIn(
@@ -41,7 +43,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
           password: _passwordController.text,
         );
 
-    if (!mounted) return;
+    if (!mounted) {
+      return;
+    }
     setState(() => _isSubmitting = false);
 
     if (!success) {
@@ -61,7 +65,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     // permanent entry point (main.dart's `home:`) so this explicit
     // push-and-clear becomes unnecessary — noted here so it isn't
     // forgotten when that phase lands.
-    if (!mounted) return;
+    if (!mounted) {
+      return;
+    }
     Navigator.of(context).pushAndRemoveUntil(
       MaterialPageRoute(builder: (_) => const SplashScreen()),
       (route) => false,
@@ -100,9 +106,12 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                       labelText: 'Email',
                       prefixIcon: Icon(Icons.email_outlined)),
                   validator: (v) {
-                    if (v == null || v.trim().isEmpty)
+                    if (v == null || v.trim().isEmpty) {
                       return 'Email is required';
-                    if (!v.contains('@')) return 'Enter a valid email';
+                    }
+                    if (!v.contains('@')) {
+                      return 'Enter a valid email';
+                    }
                     return null;
                   },
                 ),

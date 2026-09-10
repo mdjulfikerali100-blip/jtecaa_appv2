@@ -9,7 +9,7 @@
 // ⚠️ PHASE-ORDERING NOTE (per the Master Prompt's own instruction for
 // Phase 3B): "wire the News-tab reuse only once Phase 8 exists." Phase 5
 // (DirectoryScreen) and Phase 8 (NewsScreen) don't exist yet, so the two
-// tabs below render complete, runnable placeholder content — not TODO
+// tabs below render complete, runnable placeholder content — not
 // stubs — so this shell compiles and its navigation/bottom-nav behavior
 // is fully testable today. When Phase 5/8 land, swapping in the real
 // screens is a two-line change (import + replace the placeholder widget

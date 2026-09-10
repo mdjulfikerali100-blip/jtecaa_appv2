@@ -46,11 +46,15 @@ class _VerificationGateScreenState
   }
 
   Future<void> _checkVerified() async {
-    if (_isChecking) return;
+    if (_isChecking) {
+      return;
+    }
     _isChecking = true;
     await ref.read(authControllerProvider.notifier).reloadUser();
     _isChecking = false;
-    if (!mounted) return;
+    if (!mounted) {
+      return;
+    }
 
     if (ref.read(authControllerProvider.notifier).isEmailVerified) {
       _pollTimer?.cancel();
@@ -83,12 +87,16 @@ class _VerificationGateScreenState
     setState(() => _isResending = true);
     try {
       await ref.read(authControllerProvider.notifier).sendEmailVerification();
-      if (!mounted) return;
+      if (!mounted) {
+        return;
+      }
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Verification email sent again.')),
       );
     } catch (e) {
-      if (!mounted) return;
+      if (!mounted) {
+        return;
+      }
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Could not resend: $e')),
       );
@@ -118,7 +126,7 @@ class _VerificationGateScreenState
                 const SizedBox(height: 8),
                 Text(
                   'We sent a verification link to $email. Please check your inbox '
-                  '(and spam folder) and tap the link to continue.',
+                  '(spam folder) and tap the link to continue.',
                   textAlign: TextAlign.center,
                   style: theme.textTheme.bodyMedium
                       ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
@@ -141,9 +149,21 @@ class _VerificationGateScreenState
                 const SizedBox(height: 12),
                 TextButton(
                   onPressed: () async {
+                    // ⚠️ FIX (use_build_context_synchronously): capture
+                    // the Navigator BEFORE the `await`, not after — the
+                    // `mounted` check alone doesn't satisfy this lint
+                    // because it can't statically prove `context` itself
+                    // is still valid at the point of use, only that the
+                    // State object hasn't been disposed. Grabbing
+                    // `Navigator.of(context)` while `context` is
+                    // definitely fresh (before any await) avoids the
+                    // warning without changing behavior.
+                    final navigator = Navigator.of(context);
                     await ref.read(authControllerProvider.notifier).signOut();
-                    if (!mounted) return;
-                    Navigator.of(context).pushAndRemoveUntil(
+                    if (!mounted) {
+                      return;
+                    }
+                    navigator.pushAndRemoveUntil(
                       MaterialPageRoute(builder: (_) => const LoginScreen()),
                       (route) => false,
                     );

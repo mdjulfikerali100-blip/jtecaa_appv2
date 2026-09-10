@@ -40,7 +40,9 @@ class StudentProfileRepository {
       {bool forceRefresh = false}) async {
     if (!forceRefresh) {
       final cached = _readFromCache(uid);
-      if (cached != null) return cached;
+      if (cached != null) {
+        return cached;
+      }
     }
 
     final data = await _proxy.getStudentByUid(uid);
@@ -85,18 +87,24 @@ class StudentProfileRepository {
 
   StudentProfileModel? _readFromCache(String uid) {
     final raw = _readRawFromCache(uid);
-    if (raw == null) return null;
+    if (raw == null) {
+      return null;
+    }
     return StudentProfileModel.fromMap(raw);
   }
 
   Map<String, dynamic>? _readRawFromCache(String uid) {
     final raw = HiveService.get(CacheKeys.studentProfileBox, uid);
-    if (raw == null) return null;
+    if (raw == null) {
+      return null;
+    }
     try {
       final decoded = jsonDecode(raw as String) as Map<String, dynamic>;
       final cachedAt = decoded['cachedAt'] as int? ?? 0;
       final age = DateTime.now().millisecondsSinceEpoch - cachedAt;
-      if (age > CacheKeys.studentProfileTtl.inMilliseconds) return null;
+      if (age > CacheKeys.studentProfileTtl.inMilliseconds) {
+        return null;
+      }
       return decoded['data'] as Map<String, dynamic>;
     } catch (_) {
       return null;

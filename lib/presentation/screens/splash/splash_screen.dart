@@ -112,10 +112,14 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
   }
 
   void _maybeNavigate() {
-    if (!_minDurationElapsed || _hasNavigated || !mounted) return;
+    if (!_minDurationElapsed || _hasNavigated || !mounted) {
+      return;
+    }
 
     final authAsync = ref.read(authStateProvider);
-    if (authAsync.isLoading) return; // wait for the auth stream's first event
+    if (authAsync.isLoading) {
+      return;
+    } // wait for the auth stream's first event
 
     final user = authAsync.valueOrNull;
     if (user == null) {
@@ -131,8 +135,9 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
     if (roleAsync.isLoading) return; // wait for roles/{uid} to resolve
     final role = roleAsync.valueOrNull;
     if (role == null) {
-      return; // still resolving or an error state — stay on splash
-    }
+      return;
+    } // still resolving or an error state — stay on splash
+
     if (role == SignupRole.student) {
       _navigateOnce(const StudentShell());
     } else {
@@ -141,7 +146,9 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
   }
 
   void _navigateOnce(Widget screen) {
-    if (_hasNavigated || !mounted) return;
+    if (_hasNavigated || !mounted) {
+      return;
+    }
     _hasNavigated = true;
     Navigator.of(context).pushAndRemoveUntil(
       MaterialPageRoute(builder: (_) => screen),

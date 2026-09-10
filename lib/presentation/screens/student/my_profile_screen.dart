@@ -97,7 +97,9 @@ class _MyProfileFormState extends ConsumerState<_MyProfileForm> {
   }
 
   Future<void> _save() async {
-    if (!_formKey.currentState!.validate()) return;
+    if (!_formKey.currentState!.validate()) {
+      return;
+    }
     setState(() => _isSaving = true);
 
     try {
@@ -112,12 +114,16 @@ class _MyProfileFormState extends ConsumerState<_MyProfileForm> {
         },
       );
       ref.invalidate(myStudentProfileProvider);
-      if (!mounted) return;
+      if (!mounted) {
+        return;
+      }
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Profile updated.')),
       );
     } catch (e) {
-      if (!mounted) return;
+      if (!mounted) {
+        return;
+      }
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Could not save: $e')),
       );
@@ -170,7 +176,7 @@ class _MyProfileFormState extends ConsumerState<_MyProfileForm> {
           ),
           const SizedBox(height: 16),
           DropdownButtonFormField<String>(
-            value: _district,
+            initialValue: _district,
             decoration: const InputDecoration(labelText: 'District (optional)'),
             items: Districts.all
                 .map((d) => DropdownMenuItem(value: d, child: Text(d)))
@@ -182,7 +188,7 @@ class _MyProfileFormState extends ConsumerState<_MyProfileForm> {
             controller: _locationController,
             decoration: const InputDecoration(
               labelText: 'Current Location (optional)',
-              hintText: 'e.g. Mirpur-10, Dhaka',
+              hintText: 'e.g. Sher e bangla hall ,JTEC',
             ),
             textCapitalization: TextCapitalization.words,
             maxLength: 80,

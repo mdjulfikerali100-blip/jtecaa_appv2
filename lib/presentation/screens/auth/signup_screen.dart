@@ -94,7 +94,9 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
   }
 
   Future<void> _submit() async {
-    if (!_formKey.currentState!.validate()) return;
+    if (!_formKey.currentState!.validate()) {
+      return;
+    }
 
     final batchNumber = BatchHelper.extractBatchNumber(_selectedBatch ?? '');
 
@@ -126,7 +128,9 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
         );
 
     if (uid == null) {
-      if (!mounted) return;
+      if (!mounted) {
+        return;
+      }
       setState(() => _isSubmitting = false);
       final error = ref.read(authControllerProvider).error;
       _showError(
@@ -187,7 +191,9 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
       }
     } catch (e) {
       await ref.read(authControllerProvider.notifier).rollbackAccount();
-      if (!mounted) return;
+      if (!mounted) {
+        return;
+      }
       setState(() => _isSubmitting = false);
       _showError('Could not finish signup, please try again: $e');
       return;
@@ -197,7 +203,9 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
     // §M.1) and move to the gate screen.
     await ref.read(authControllerProvider.notifier).sendEmailVerification();
 
-    if (!mounted) return;
+    if (!mounted) {
+      return;
+    }
     setState(() => _isSubmitting = false);
     Navigator.of(context).pushAndRemoveUntil(
       MaterialPageRoute(builder: (_) => const VerificationGateScreen()),
@@ -212,7 +220,6 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
     final isAlumni = _selectedRole == SignupRole.alumni;
 
     return Scaffold(
@@ -249,7 +256,7 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
                 decoration: InputDecoration(
                   labelText: isAlumni ? 'Alumni ID' : 'Student ID',
                   hintText:
-                      isAlumni ? 'jtec..........alumni' : 'jtec........student',
+                      isAlumni ? 'jtec.........alumni' : 'jtec.........student',
                   prefixIcon: const Icon(Icons.badge_outlined),
                 ),
                 validator: (v) =>
@@ -295,8 +302,12 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
                 decoration: const InputDecoration(
                     labelText: 'Email', prefixIcon: Icon(Icons.email_outlined)),
                 validator: (v) {
-                  if (v == null || v.trim().isEmpty) return 'Email is required';
-                  if (!v.contains('@')) return 'Enter a valid email';
+                  if (v == null || v.trim().isEmpty) {
+                    return 'Email is required';
+                  }
+                  if (!v.contains('@')) {
+                    return 'Enter a valid email';
+                  }
                   return null;
                 },
               ),
@@ -353,7 +364,7 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
       // ⚠️ Appendix G.2 rule: value is the raw code, child shows the
       // short label — never render the raw department code directly.
       DropdownButtonFormField<String>(
-        value: _department,
+        initialValue: _department,
         decoration: const InputDecoration(labelText: 'Department'),
         items: Departments.all
             .map((d) => DropdownMenuItem(
@@ -376,14 +387,14 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
         controller: _alumniLocationController,
         decoration: const InputDecoration(
           labelText: 'Current Location',
-          hintText: 'e.g. Mirpur-10, Dhaka',
+          hintText: 'e.g. Sher e bangla hall ,JTEC',
         ),
         textCapitalization: TextCapitalization.words,
         maxLength: 80,
         validator: (v) => (v == null || v.trim().isEmpty) ? 'Required' : null,
       ),
       DropdownButtonFormField<String>(
-        value: _districtAlumni,
+        initialValue: _districtAlumni,
         decoration: const InputDecoration(labelText: 'District'),
         items: Districts.all
             .map((d) => DropdownMenuItem(value: d, child: Text(d)))
@@ -401,7 +412,7 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
       ),
       const SizedBox(height: 12),
       DropdownButtonFormField<String>(
-        value: _careerStatus,
+        initialValue: _careerStatus,
         decoration: const InputDecoration(labelText: 'Current Status'),
         items: CareerStatusCategories.getDropdownItems(),
         onChanged: (v) => setState(() => _careerStatus = v),
@@ -430,7 +441,7 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
       ),
       const SizedBox(height: 12),
       DropdownButtonFormField<String>(
-        value: _districtStudent,
+        initialValue: _districtStudent,
         decoration: const InputDecoration(labelText: 'District (optional)'),
         items: Districts.all
             .map((d) => DropdownMenuItem(value: d, child: Text(d)))
@@ -442,7 +453,7 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
         controller: _studentLocationController,
         decoration: const InputDecoration(
           labelText: 'Current Location (optional)',
-          hintText: 'e.g. Mirpur-10, Dhaka',
+          hintText: 'e.g. Sher e bangla hall ,JTEC',
         ),
         textCapitalization: TextCapitalization.words,
         maxLength: 80,

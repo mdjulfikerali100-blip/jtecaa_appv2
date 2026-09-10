@@ -107,11 +107,15 @@ final roleProvider =
 /// than manually chaining authStateProvider + roleProvider themselves.
 final myRoleProvider = Provider<AsyncValue<SignupRole?>>((ref) {
   final authState = ref.watch(authStateProvider);
-  if (authState.isLoading) return const AsyncValue.loading();
+  if (authState.isLoading) {
+    return const AsyncValue.loading();
+  }
   if (authState.hasError) {
     return AsyncValue.error(authState.error!, authState.stackTrace!);
   }
   final user = authState.value;
-  if (user == null) return const AsyncValue.data(null);
+  if (user == null) {
+    return const AsyncValue.data(null);
+  }
   return ref.watch(roleProvider(user.uid));
 });

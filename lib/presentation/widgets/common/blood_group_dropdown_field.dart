@@ -24,7 +24,8 @@ class BloodGroupDropdownField extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return DropdownButtonFormField<String>(
-      value: value,
+      // ⚠️ Same rename + safety note as batch_dropdown_field.dart.
+      initialValue: value,
       decoration: const InputDecoration(
         labelText: 'Blood Group',
         prefixIcon: Icon(Icons.bloodtype_outlined),

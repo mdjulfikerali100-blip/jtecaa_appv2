@@ -29,14 +29,18 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
   }
 
   Future<void> _submit() async {
-    if (!_formKey.currentState!.validate()) return;
+    if (!_formKey.currentState!.validate()) {
+      return;
+    }
     setState(() => _isSubmitting = true);
 
     final success = await ref
         .read(authControllerProvider.notifier)
         .sendPasswordReset(_emailController.text.trim());
 
-    if (!mounted) return;
+    if (!mounted) {
+      return;
+    }
     setState(() => _isSubmitting = false);
 
     if (success) {
@@ -84,8 +88,12 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
             decoration: const InputDecoration(
                 labelText: 'Email', prefixIcon: Icon(Icons.email_outlined)),
             validator: (v) {
-              if (v == null || v.trim().isEmpty) return 'Email is required';
-              if (!v.contains('@')) return 'Enter a valid email';
+              if (v == null || v.trim().isEmpty) {
+                return 'Email is required';
+              }
+              if (!v.contains('@')) {
+                return 'Enter a valid email';
+              }
               return null;
             },
           ),

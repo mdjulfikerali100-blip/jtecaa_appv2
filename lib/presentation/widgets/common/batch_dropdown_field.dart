@@ -29,7 +29,14 @@ class BatchDropdownField extends StatelessWidget {
     final batchOptions = BatchHelper.generateBatchOptions();
 
     return DropdownButtonFormField<String>(
-      value: value,
+      // ⚠️ Renamed `value:` → `initialValue:` (Flutter SDK deprecation,
+      // post v3.33). Verified safe for this widget's usage pattern: every
+      // call site (Signup, Profile Edit) already knows the correct value
+      // the moment this widget first builds — nothing re-sets it on an
+      // already-built instance from an external async source later, so
+      // the "initial value only" semantics of the new name match how
+      // this widget was already being used.
+      initialValue: value,
       decoration: const InputDecoration(
         labelText: 'Batch',
         prefixIcon: Icon(Icons.school_outlined),
