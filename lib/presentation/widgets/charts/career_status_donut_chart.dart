@@ -3,24 +3,23 @@
 // Architecture Appendix F.6.O — clickable donut chart, center total,
 // legend below, haptic feedback + filter navigation on segment tap.
 //
-// ⚠️ SPEC CONTRADICTION RESOLVED: Appendix F.6.O's prose describes "5
-// segments: 5 career categories" with 5 distinct colors, but Architecture
-// §8.3's own actual runnable code computes `DashboardStats.careerStatus`
-// as only 3 buckets — `{'Employed', 'Unemployed', 'Higher Studies'}` —
-// bucketing the 5 raw CareerStatusCategories down to 3 to keep the
-// `.count()` query total low (3 queries instead of 5). §8.3's concrete,
-// wired-up code (`home_screen.dart` snippet passing `stats.careerStatus`
-// straight into this widget) is the source of truth followed here, not
-// F.6.O's narrative-only "5 segments" description — a 5-segment chart
-// would need data this app never actually computes.
+// ⚠️ UPDATE — REVERSES an earlier resolution: this widget originally
+// shipped with only 3 segments because Architecture §8.3's own runnable
+// code only computed 3 career-status buckets. Per explicit user request,
+// StatsRepository (Phase 2) now runs 5 separate `.count()` queries
+// instead — one per raw CareerStatusCategories value — so
+// DashboardStats.careerStatus carries all 5 keys again, matching
+// Appendix F.6.O's original "5 segments: 5 career categories" spec. This
+// widget was updated to match.
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:fl_chart/fl_chart.dart';
 
+import '../../../core/utils/career_status_categories.dart';
+
 class CareerStatusDonutChart extends StatelessWidget {
-  /// Exactly the 3 keys DashboardStats.careerStatus produces (§8.3):
-  /// 'Employed', 'Unemployed', 'Higher Studies'.
+  /// The 5 raw CareerStatusCategories.all keys → their counts.
   final Map<String, int> data;
   final ValueChanged<String> onSegmentTap;
   final VoidCallback? onCenterTap;
@@ -31,17 +30,6 @@ class CareerStatusDonutChart extends StatelessWidget {
     required this.onSegmentTap,
     this.onCenterTap,
   });
-
-  /// Colors approximate the design-system palette (Appendix F.2) for the
-  /// raw category each bucket represents: 'Employed' ≈ 'Job Holder'
-  /// (Primary Navy), 'Unemployed' ≈ 'Looking for a Job' (Warning Amber),
-  /// 'Higher Studies' represents the merged Higher-Studies-family bucket
-  /// (Tertiary Teal).
-  static const Map<String, Color> _bucketColors = {
-    'Employed': Color(0xFF1A365D),
-    'Unemployed': Color(0xFFD97706),
-    'Higher Studies': Color(0xFF0F766E),
-  };
 
   bool get _isAllZero => data.values.every((v) => v == 0);
 
@@ -140,26 +128,41 @@ class CareerStatusDonutChart extends StatelessWidget {
                     ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
               )
             else
+              // ⚠️ Appendix K.3 overflow-safety pattern applied here too:
+              // with all 5 raw categories now shown (including the long
+              // "Preparing for a Government Job"), each legend entry uses
+              // the SHORT display label (CareerStatusCategories.
+              // getDisplayLabel) plus maxLines:1 + ellipsis, so a long
+              // category name can never push the Wrap into an ugly
+              // horizontal overflow on a narrow device.
               Wrap(
                 spacing: 12,
                 runSpacing: 8,
                 alignment: WrapAlignment.center,
                 children: data.entries.map((e) {
-                  final color = _bucketColors[e.key] ??
-                      theme.colorScheme.onSurfaceVariant;
-                  return Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Container(
-                        width: 10,
-                        height: 10,
-                        decoration:
-                            BoxDecoration(color: color, shape: BoxShape.circle),
-                      ),
-                      const SizedBox(width: 6),
-                      Text('${e.key} (${e.value})',
-                          style: theme.textTheme.labelSmall),
-                    ],
+                  final color = CareerStatusCategories.getColor(e.key);
+                  return ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 160),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Container(
+                          width: 10,
+                          height: 10,
+                          decoration: BoxDecoration(
+                              color: color, shape: BoxShape.circle),
+                        ),
+                        const SizedBox(width: 6),
+                        Flexible(
+                          child: Text(
+                            '${CareerStatusCategories.getDisplayLabel(e.key)} (${e.value})',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: theme.textTheme.labelSmall,
+                          ),
+                        ),
+                      ],
+                    ),
                   );
                 }).toList(),
               ),
@@ -171,11 +174,13 @@ class CareerStatusDonutChart extends StatelessWidget {
 
   List<PieChartSectionData> _buildSections(ThemeData theme) {
     // Architecture §8.3: "treat an all-zero data map as a valid, drawable
-    // state — render three equal, muted-gray placeholder segments...
-    // instead of an empty canvas."
+    // state — render equal, muted-gray placeholder segments instead of an
+    // empty canvas." Uses CareerStatusCategories.all.length (5) rather
+    // than a hardcoded 3, so this stays correct if the category count
+    // ever changes.
     if (_isAllZero) {
       return List.generate(
-        3,
+        CareerStatusCategories.all.length,
         (i) => PieChartSectionData(
           value: 1,
           color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.2),
@@ -185,7 +190,7 @@ class CareerStatusDonutChart extends StatelessWidget {
       );
     }
     return data.entries.map((e) {
-      final color = _bucketColors[e.key] ?? theme.colorScheme.onSurfaceVariant;
+      final color = CareerStatusCategories.getColor(e.key);
       return PieChartSectionData(
         value: e.value.toDouble(),
         color: color,

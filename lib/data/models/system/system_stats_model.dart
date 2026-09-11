@@ -11,7 +11,7 @@
 class DashboardStats {
   final int totalAlumni;
   final Map<String, int>
-      careerStatus; // {'Employed': x, 'Unemployed': y, 'Higher Studies': z}
+      careerStatus; // 5 raw categories (Appendix F.6.O), e.g. {'Job Holder': x, ...}
   final Map<String, int> departments; // {'YARN_ENGINEERING': x, ...}
   final int activeBatchCount; // distinct batches with ≥1 alumni
   final int districtsCoveredCount; // distinct districts with ≥1 alumni
@@ -36,12 +36,24 @@ class DashboardStats {
   /// (lib/core/utils/departments_helper.dart) and is passed in by the
   /// caller rather than hardcoded here, so this model file has no
   /// dependency on the utils layer.
+  ///
+  /// ⚠️ `careerStatus`'s 5 keys ARE hardcoded directly (unlike
+  /// `departments`) — these exact 5 strings ('Job Holder', 'Looking for a
+  /// Job', 'Higher Studies', 'Preparing for Higher Studies', 'Preparing
+  /// for a Government Job') are fixed, foundational values used
+  /// throughout the app's Career Status dropdown (Appendix G.3) and are
+  /// never expected to change independently of a full data-model
+  /// migration, unlike departments which are more plausibly extended
+  /// over time — so parameterizing them here would add ceremony without
+  /// real benefit.
   factory DashboardStats.empty(List<String> departmentCodes) => DashboardStats(
         totalAlumni: 0,
         careerStatus: const {
-          'Employed': 0,
-          'Unemployed': 0,
-          'Higher Studies': 0
+          'Job Holder': 0,
+          'Looking for a Job': 0,
+          'Higher Studies': 0,
+          'Preparing for Higher Studies': 0,
+          'Preparing for a Government Job': 0,
         },
         departments: {for (final d in departmentCodes) d: 0},
         activeBatchCount: 0,

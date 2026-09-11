@@ -12,6 +12,7 @@ import 'dart:convert';
 import '../../core/constants/app_constants.dart';
 import '../../core/constants/cache_keys.dart';
 import '../../core/constants/firestore_paths.dart';
+import '../../core/utils/career_status_categories.dart';
 import '../datasources/local/hive_service.dart';
 import '../datasources/remote/firestore_service.dart';
 import '../models/system/system_stats_model.dart';
@@ -53,20 +54,19 @@ class StatsRepository {
     // 1. Total Alumni — a single, cheap .count() query. No filter needed.
     final total = await _firestoreService.countQuery(usersPublic);
 
-    // 2. Career Status, bucketed into 3 UI groups from the 5 raw values.
-    final employed = await _firestoreService.countQuery(
-      usersPublic.where('s', isEqualTo: 'Job Holder'),
-    );
-    final unemployed = await _firestoreService.countQuery(
-      usersPublic.where('s', isEqualTo: 'Looking for a Job'),
-    );
-    final higherStudies = await _firestoreService.countQuery(
-      usersPublic.where('s', whereIn: [
-        'Higher Studies',
-        'Preparing for Higher Studies',
-        'Preparing for a Government Job',
-      ]),
-    );
+    // 2. Career Status — Appendix F.6.O: 5 distinct segments (per
+    // explicit user decision — supersedes the earlier 3-bucket version).
+    // Costs 5 .count() queries instead of 3 (+2 per refresh) — trivial
+    // against this app's already-generous per-refresh budget (the
+    // batch+district loops below already run up to ~214 queries, and
+    // §8.3 explicitly accepts that as "comfortably inside the Spark free
+    // tier at this app's scale").
+    final careerStatusCounts = <String, int>{};
+    for (final category in CareerStatusCategories.all) {
+      careerStatusCounts[category] = await _firestoreService.countQuery(
+        usersPublic.where('s', isEqualTo: category),
+      );
+    }
 
     // 3. Departments — 4 known enum values (AppConstants.departments).
     final departmentCounts = <String, int>{};
@@ -87,7 +87,9 @@ class StatsRepository {
     for (final batch in AppConstants.knownBatches) {
       final c = await _firestoreService
           .countQuery(usersPublic.where('b', isEqualTo: batch));
-      if (c > 0) activeBatches++;
+      if (c > 0) {
+        activeBatches++;
+      }
     }
 
     // 5. Districts Covered — Bangladesh's fixed 64-district list.
@@ -95,16 +97,14 @@ class StatsRepository {
     for (final dist in AppConstants.bdDistricts) {
       final c = await _firestoreService
           .countQuery(usersPublic.where('dist', isEqualTo: dist));
-      if (c > 0) districtsCovered++;
+      if (c > 0) {
+        districtsCovered++;
+      }
     }
 
     return DashboardStats(
       totalAlumni: total,
-      careerStatus: {
-        'Employed': employed,
-        'Unemployed': unemployed,
-        'Higher Studies': higherStudies,
-      },
+      careerStatus: careerStatusCounts,
       departments: departmentCounts,
       activeBatchCount: activeBatches,
       districtsCoveredCount: districtsCovered,
