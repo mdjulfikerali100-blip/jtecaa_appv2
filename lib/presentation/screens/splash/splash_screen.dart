@@ -16,6 +16,7 @@ import '../../providers/auth_provider.dart';
 import '../../providers/role_provider.dart';
 import '../auth/login_screen.dart';
 import '../auth/verification_gate_screen.dart';
+import '../home/home_screen.dart'; // ⚠️ NEW (Phase 4) — replaces the placeholder
 import '../student/student_shell.dart';
 
 class SplashScreen extends ConsumerStatefulWidget {
@@ -32,6 +33,8 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
   late final Animation<double> _fade;
   bool _minDurationElapsed = false;
   bool _hasNavigated = false;
+  // ⚠️ NEW — see _maybeNavigate()'s fix note below for why this exists.
+  Object? _roleError;
 
   @override
   void initState() {
@@ -67,6 +70,12 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
     // read completes slightly after auth does.
     ref.listen(authStateProvider, (_, __) => _maybeNavigate());
     ref.listen(myRoleProvider, (_, __) => _maybeNavigate());
+
+    // ⚠️ NEW — see _maybeNavigate()'s fix note. Shows the real error
+    // (e.g. a missing Firestore Database) instead of an infinite spinner.
+    if (_roleError != null) {
+      return _buildErrorScreen(context);
+    }
 
     return Scaffold(
       backgroundColor: Theme.of(context).colorScheme.primary,
@@ -111,6 +120,66 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
     );
   }
 
+  /// ⚠️ NEW — the actual fix. Shown whenever role resolution
+  /// (roles/{uid} read, §M.5) fails for any reason — most commonly a
+  /// Firestore Database that was never created in the Firebase Console,
+  /// or Security Rules that haven't been deployed yet (both leave every
+  /// Firestore call throwing). The raw error is displayed on purpose
+  /// during development so the real cause is visible instead of hidden
+  /// behind a silent, infinite spinner.
+  Widget _buildErrorScreen(BuildContext context) {
+    final theme = Theme.of(context);
+    return Scaffold(
+      backgroundColor: theme.colorScheme.surface,
+      body: SafeArea(
+        child: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.cloud_off_outlined,
+                    size: 56, color: theme.colorScheme.error),
+                const SizedBox(height: 16),
+                Text('Could not connect', style: theme.textTheme.titleLarge),
+                const SizedBox(height: 8),
+                Text(
+                  '$_roleError',
+                  textAlign: TextAlign.center,
+                  style: theme.textTheme.bodySmall
+                      ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+                ),
+                const SizedBox(height: 24),
+                ElevatedButton(
+                  onPressed: () {
+                    final uid = ref.read(authStateProvider).valueOrNull?.uid;
+                    setState(() => _roleError = null);
+                    if (uid != null) {
+                      ref.invalidate(roleProvider(uid));
+                    }
+                    _maybeNavigate();
+                  },
+                  child: const Text('Retry'),
+                ),
+                const SizedBox(height: 12),
+                TextButton(
+                  onPressed: () async {
+                    await ref.read(authControllerProvider.notifier).signOut();
+                    if (!mounted) {
+                      return;
+                    }
+                    setState(() => _roleError = null);
+                  },
+                  child: const Text('Sign out'),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
   void _maybeNavigate() {
     if (!_minDurationElapsed || _hasNavigated || !mounted) {
       return;
@@ -132,16 +201,31 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
     }
 
     final roleAsync = ref.read(myRoleProvider);
-    if (roleAsync.isLoading) return; // wait for roles/{uid} to resolve
+    if (roleAsync.isLoading) {
+      return; // wait for roles/{uid} to resolve
+    }
+    // ⚠️ THE ACTUAL FIX (root cause of "stuck on Splash after login"):
+    // the previous version only checked `roleAsync.valueOrNull == null`,
+    // which is ALSO true when roleAsync is in an ERROR state (no value
+    // was ever produced) — so an error was silently treated exactly like
+    // "still resolving" and the app waited forever with zero feedback.
+    // Any Firestore failure (most commonly: the Firestore Database was
+    // never created in the Firebase Console, or Security Rules reject
+    // the read) now surfaces here explicitly instead of hanging.
+    if (roleAsync.hasError) {
+      setState(() => _roleError = roleAsync.error);
+      return;
+    }
     final role = roleAsync.valueOrNull;
     if (role == null) {
-      return;
-    } // still resolving or an error state — stay on splash
+      return; // genuinely still resolving — keep waiting
+    }
 
     if (role == SignupRole.student) {
       _navigateOnce(const StudentShell());
     } else {
-      _navigateOnce(const _AlumniShellPlaceholder());
+      // ⚠️ CHANGED (Phase 4) — was `const _AlumniShellPlaceholder()`.
+      _navigateOnce(const HomeScreen());
     }
   }
 
@@ -153,24 +237,6 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
     Navigator.of(context).pushAndRemoveUntil(
       MaterialPageRoute(builder: (_) => screen),
       (route) => false,
-    );
-  }
-}
-
-/// ⚠️ TEMPORARY — HomeScreen (Phase 4) doesn't exist yet. This is a
-/// complete, runnable placeholder so Splash's navigation logic is fully
-/// testable today; Phase 4 will replace `_AlumniShellPlaceholder()` above
-/// with `const HomeScreen()` — a one-line change, nothing else in this
-/// file needs to move.
-class _AlumniShellPlaceholder extends StatelessWidget {
-  const _AlumniShellPlaceholder();
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text('JTECAA')),
-      body:
-          const Center(child: Text('Alumni Home (Phase 4) will render here.')),
     );
   }
 }

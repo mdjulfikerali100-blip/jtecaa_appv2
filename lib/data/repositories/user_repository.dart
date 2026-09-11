@@ -66,10 +66,23 @@ class UserRepository {
 
     // 3. system/config.uv — version bump so every other device's next
     //    cache-check (§6.5) notices a new alumnus joined.
-    batch.update(_firestoreService.doc(FirestorePaths.systemConfig), {
-      'uv': FieldValue.increment(1),
-      'uua': now,
-    });
+    // ⚠️ FIX (root cause): `batch.update()` requires the target document
+    // to already exist — on a brand-new Firestore database, `system/config`
+    // has never been written yet, so `update()` throws "No document to
+    // update". `set(..., SetOptions(merge: true))` self-heals this: it
+    // CREATES the doc on the very first write, and MERGES on every write
+    // after that (leaving jv/jua/nv/nua/fr/mc/ttl — the fields this app
+    // never touches — untouched). FieldValue.increment(1) is correct in
+    // both cases: Firestore treats a missing numeric field as 0 before
+    // incrementing.
+    batch.set(
+      _firestoreService.doc(FirestorePaths.systemConfig),
+      {
+        'uv': FieldValue.increment(1),
+        'uua': now,
+      },
+      SetOptions(merge: true),
+    );
 
     // 4. roles/{uid} — write-once role flag (§M.5). Written in the SAME
     //    atomic batch as the profile documents so a half-finished signup
@@ -131,10 +144,15 @@ class UserRepository {
       _firestoreService.collection(FirestorePaths.usersPublic).doc(uid),
       _buildPublicMap(uid: uid, privateData: privateData, now: now),
     );
-    batch.update(_firestoreService.doc(FirestorePaths.systemConfig), {
-      'uv': FieldValue.increment(1),
-      'uua': now,
-    });
+    // ⚠️ FIX — same self-healing rationale as signUpAlumni() above.
+    batch.set(
+      _firestoreService.doc(FirestorePaths.systemConfig),
+      {
+        'uv': FieldValue.increment(1),
+        'uua': now,
+      },
+      SetOptions(merge: true),
+    );
 
     try {
       await batch.commit(); // atomic — either all writes land, or none do

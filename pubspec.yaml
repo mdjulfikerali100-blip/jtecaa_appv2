@@ -32,6 +32,12 @@ dependencies:
   google_fonts: ^6.2.0     # Playfair Display + Inter (Appendix F.3)
   shimmer: ^3.0.0          # Skeleton loading (Appendix F.6.N)
   url_launcher: ^6.2.0     # tel:/https:/wa.me launching (Appendix B.1)
+  # ⚠️ NEW (Phase 4) — Career Status Donut Chart (Appendix F.6.O). Not
+  # included in any earlier phase's pubspec because nothing needed
+  # charting until the Home Dashboard. Verify with `flutter pub outdated`
+  # after `flutter pub get` in case a newer stable release exists by the
+  # time this is run.
+  fl_chart: ^0.68.0
 
   # Network — Google Sheets Proxy (Jobs/News/Students, §5 + §M.4)
   http: ^1.2.0
@@ -42,7 +48,7 @@ dependencies:
   flutter_image_compress: ^2.3.0     # Compress to ≤300KB before Drive upload
   path_provider: ^2.1.0
   connectivity_plus: ^6.0.0          # Network status for offline-first UX
-  workmanager: ^0.5.0                # Background sync / cache purge (§H.2)
+  workmanager: ^0.7.0                # Background sync / cache purge (§H.2)
 
 dev_dependencies:
   flutter_test:

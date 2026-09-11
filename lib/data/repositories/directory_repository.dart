@@ -42,6 +42,7 @@ class DirectoryRepository {
   final FirestoreService _firestoreService;
   static const String _cacheKey = 'first_page_v1';
   static const String _cacheVersionKey = 'first_page_synced_uv';
+  static const String _recentCacheKey = 'recent_alumni_v1';
 
   DirectoryRepository(this._firestoreService);
 
@@ -72,6 +73,87 @@ class DirectoryRepository {
       alumni: alumni,
       lastDocument: snapshot.docs.isNotEmpty ? snapshot.docs.last : null,
       hasMore: snapshot.docs.length == pageSize,
+    );
+  }
+
+  /// Architecture §7.2 "Recent Alumni" — the 5 most recently updated
+  /// profiles, shown as a horizontal mini-card list on the Home Dashboard
+  /// (Phase 4). Cached separately from the main paginated list (own key,
+  /// own 24h TTL per §6.2's `alumni_public` TTL row) since it's a much
+  /// smaller, independently-refreshed slice of the same collection.
+  ///
+  /// ⚠️ SPEC CONTRADICTION RESOLVED: Architecture §7.2 literally says
+  /// "orderBy ca desc" — but `ca` (created-at) does not exist anywhere in
+  /// the actual `users_public` document schema (§4.2.B lists only `lu`,
+  /// last-updated). This repository — and `UserPublicModel`, Phase 1 —
+  /// both correctly follow the real schema (§4.2.B), which has no `ca`
+  /// field to order by. Ordering by `lu` desc is the closest available
+  /// proxy for "recent" using a field that actually exists on the
+  /// document.
+  Future<List<UserPublicModel>> getRecentAlumni(
+      {int limit = 5, bool forceRefresh = false}) async {
+    if (!forceRefresh) {
+      final cached = _readRecentFromCache();
+      if (cached != null) return cached;
+    }
+    final snapshot = await _firestoreService.fetchPage(
+      query: _usersPublic.orderBy('lu', descending: true),
+      limit: limit,
+    );
+    final alumni =
+        snapshot.docs.map((d) => UserPublicModel.fromMap(d.data())).toList();
+    await _writeRecentToCache(alumni);
+    return alumni;
+  }
+
+  List<UserPublicModel>? _readRecentFromCache() {
+    final raw = HiveService.get(CacheKeys.alumniPublicBox, _recentCacheKey);
+    if (raw == null) return null;
+    try {
+      final decoded = jsonDecode(raw as String) as Map<String, dynamic>;
+      final cachedAt = decoded['cachedAt'] as int? ?? 0;
+      final age = DateTime.now().millisecondsSinceEpoch - cachedAt;
+      if (age > CacheKeys.alumniPublicTtl.inMilliseconds) return null;
+      return (decoded['data'] as List)
+          .map((a) => UserPublicModel.fromMap(a as Map<String, dynamic>))
+          .toList();
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<void> _writeRecentToCache(List<UserPublicModel> alumni) async {
+    final serializable = alumni
+        .map((a) => {
+              'uid': a.uid,
+              'n': a.fullName,
+              'd': a.department,
+              'b': a.batch,
+              'bg': a.bloodGroup,
+              'dist': a.district,
+              'cl': a.currentLocation,
+              'co': a.company,
+              'des': a.designation,
+              's': a.careerStatus,
+              'purl': a.photoUrl,
+              'wa': a.whatsapp,
+              'ph': a.phone,
+              'fb': a.facebook,
+              'li': a.linkedin,
+              'ct': a.companyType,
+              'gco': a.groupOfCompanies,
+              'jd': a.jobDepartment,
+              'wx': a.workExperience.map((w) => w.toMap()).toList(),
+              'lu': a.lastUpdated,
+            })
+        .toList();
+    await HiveService.put(
+      CacheKeys.alumniPublicBox,
+      _recentCacheKey,
+      jsonEncode({
+        'data': serializable,
+        'cachedAt': DateTime.now().millisecondsSinceEpoch,
+      }),
     );
   }
 

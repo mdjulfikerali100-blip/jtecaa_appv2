@@ -12,6 +12,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../data/models/user/role_model.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/role_provider.dart';
+import '../home/home_screen.dart'; // ⚠️ NEW (Phase 4) — replaces the placeholder
 import '../student/student_shell.dart';
 import 'login_screen.dart';
 
@@ -75,9 +76,10 @@ class _VerificationGateScreenState
     final role = roleAsync.valueOrNull ?? SignupRole.alumni;
     Navigator.of(context).pushAndRemoveUntil(
       MaterialPageRoute(
+        // ⚠️ CHANGED (Phase 4) — was `const _AlumniShellPlaceholder()`.
         builder: (_) => role == SignupRole.student
             ? const StudentShell()
-            : const _AlumniShellPlaceholder(),
+            : const HomeScreen(),
       ),
       (route) => false,
     );
@@ -126,7 +128,7 @@ class _VerificationGateScreenState
                 const SizedBox(height: 8),
                 Text(
                   'We sent a verification link to $email. Please check your inbox '
-                  '(spam folder) and tap the link to continue.',
+                  '(and spam folder) and tap the link to continue.',
                   textAlign: TextAlign.center,
                   style: theme.textTheme.bodyMedium
                       ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
@@ -175,21 +177,6 @@ class _VerificationGateScreenState
           ),
         ),
       ),
-    );
-  }
-}
-
-/// ⚠️ TEMPORARY — see splash_screen.dart's identical placeholder for the
-/// full explanation. HomeScreen (Phase 4) will replace this.
-class _AlumniShellPlaceholder extends StatelessWidget {
-  const _AlumniShellPlaceholder();
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text('JTECAA')),
-      body:
-          const Center(child: Text('Alumni Home (Phase 4) will render here.')),
     );
   }
 }
