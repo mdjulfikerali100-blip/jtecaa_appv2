@@ -8,7 +8,18 @@
 // leave role_provider.dart with nothing to call, this file ships now with
 // ONLY the topic-subscription method — Phase 9 will ADD methods to this
 // same file (not replace it), so this method's signature never changes.
+//
+// ⚠️ FIX (root cause): `FirebaseMessaging.subscribeToTopic()` /
+// `unsubscribeFromTopic()` are NOT implemented on Firebase Messaging's
+// Web SDK — topic (un)subscription on Web can only be done server-side
+// via the Admin SDK, since the browser has no equivalent native FCM
+// topic API. Calling either method while running on Flutter Web throws
+// (commonly surfaces as an `UnimplementedError` / "not supported on
+// web"). Since this project targets android+ios+web (Phase 0), every
+// call site must be guarded with `kIsWeb` — web sessions simply skip
+// topic (un)subscription rather than crashing role resolution.
 
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:firebase_messaging/firebase_messaging.dart';
 
 import '../../models/user/role_model.dart';
@@ -20,6 +31,12 @@ class FCMService {
   /// three. Called once per role-resolution (role_provider.dart) — safe
   /// to call repeatedly, since (un)subscribeToTopic is idempotent.
   static Future<void> subscribeToRoleTopics(SignupRole role) async {
+    // ⚠️ Web has no topic (un)subscription API on the client SDK — skip
+    // entirely rather than letting role resolution throw on web sessions.
+    if (kIsWeb) {
+      return;
+    }
+
     final messaging = FirebaseMessaging.instance;
     if (role == SignupRole.student) {
       await messaging.subscribeToTopic('news');

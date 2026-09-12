@@ -26,6 +26,7 @@ import '../../../data/models/system/system_stats_model.dart';
 import '../../../data/models/user/user_public_model.dart';
 import '../../providers/dashboard_provider.dart';
 import '../../widgets/charts/career_status_donut_chart.dart';
+import '../directory/directory_screen.dart'; // ⚠️ NEW (Phase 5) — replaces the placeholder
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -45,7 +46,7 @@ class _HomeScreenState extends State<HomeScreen> {
     final tabs = <Widget>[
       _DashboardTab(
           onNavigateToDirectory: () => setState(() => _currentIndex = 1)),
-      const _DirectoryPlaceholderTab(),
+      const DirectoryScreen(), // ⚠️ CHANGED (Phase 5) — was `_DirectoryPlaceholderTab()`
       const _JobsPlaceholderTab(),
     ];
 
@@ -190,9 +191,19 @@ class _DashboardTab extends ConsumerWidget {
       padding: const EdgeInsets.fromLTRB(16, 24, 16, 0),
       child: Column(
         children: [
-          // ✅ FIXED
+          // ⚠️ FIX (root cause): `CrossAxisAlignment.stretch` on this Row
+          // requires the Row to be given a bounded height so it can
+          // stretch each `_StatCard` to match — but this Row sits inside
+          // a plain `Column` fed into a `SliverToBoxAdapter` (no bounded
+          // height ambient constraint), so `stretch` propagates an
+          // infinite-height constraint down into each `_StatCard`'s
+          // `Container`, crashing with "BoxConstraints forces an
+          // infinite height". Each `_StatCard` already uses
+          // `mainAxisSize: MainAxisSize.min` internally (Appendix K.3),
+          // so it doesn't need external stretching to size correctly —
+          // removing `crossAxisAlignment` entirely (default: center)
+          // fixes this without changing the cards' visual appearance.
           Row(
-            // crossAxisAlignment: CrossAxisAlignment.stretch,  ← ❌ সরিয়ে দিন
             children: [
               Expanded(
                   child: _StatCard(
@@ -473,36 +484,6 @@ class _RecentAlumniTile extends StatelessWidget {
         overflow: TextOverflow.ellipsis,
       ),
       onTap: () => _showComingSoon(context, 'Profile details'),
-    );
-  }
-}
-
-/// ⚠️ TEMPORARY — DirectoryScreen (Phase 5) will replace this. Complete
-
-/// nav is fully testable today.
-class _DirectoryPlaceholderTab extends StatelessWidget {
-  const _DirectoryPlaceholderTab();
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Scaffold(
-      appBar: AppBar(title: const Text('Alumni Directory')),
-      body: Center(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(Icons.people_outline,
-                  size: 48, color: theme.colorScheme.onSurfaceVariant),
-              const SizedBox(height: 12),
-              const Text('DirectoryScreen (Phase 5) will render here.',
-                  textAlign: TextAlign.center),
-            ],
-          ),
-        ),
-      ),
     );
   }
 }

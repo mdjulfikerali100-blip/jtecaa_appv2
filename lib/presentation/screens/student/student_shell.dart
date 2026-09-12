@@ -9,7 +9,7 @@
 // ⚠️ PHASE-ORDERING NOTE (per the Master Prompt's own instruction for
 // Phase 3B): "wire the News-tab reuse only once Phase 8 exists." Phase 5
 // (DirectoryScreen) and Phase 8 (NewsScreen) don't exist yet, so the two
-// tabs below render complete, runnable placeholder content — not
+// tabs below render complete, runnable placeholder content —
 // stubs — so this shell compiles and its navigation/bottom-nav behavior
 // is fully testable today. When Phase 5/8 land, swapping in the real
 // screens is a two-line change (import + replace the placeholder widget
@@ -17,6 +17,7 @@
 
 import 'package:flutter/material.dart';
 
+import '../directory/directory_screen.dart'; // ⚠️ NEW (Phase 5) — replaces the placeholder
 import 'my_profile_screen.dart';
 
 class StudentShell extends StatefulWidget {
@@ -29,13 +30,11 @@ class StudentShell extends StatefulWidget {
 class _StudentShellState extends State<StudentShell> {
   int _currentIndex = 0;
 
+  // ⚠️ CHANGED (Phase 5) — Directory tab is now the real DirectoryScreen
+  // (§M.6: "Reused as-is... no separate Student version needed"). News
+  // tab remains a placeholder until Phase 8.
   static const List<Widget> _tabs = [
-    _StudentPlaceholderTab(
-      icon: Icons.people_outline,
-      label: 'Alumni Directory',
-      note: 'DirectoryScreen (Phase 5) will render here — reused as-is, '
-          'no separate Student version needed (§M.6).',
-    ),
+    DirectoryScreen(),
     _StudentPlaceholderTab(
       icon: Icons.article_outlined,
       label: 'News & Updates',
