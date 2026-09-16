@@ -13,23 +13,30 @@
 //      (§8.2). No privacy filtering anywhere (Appendix E).
 //   3. Cache-first reads of the signed-in user's own profile (Hive
 //      Tier 2, 1h TTL per §6.2).
+//   4. uploadProfilePhoto() (Appendix J.4, Phase 6) — Drive photo upload
+//      + purl update, with the old-photo cleanup fix.
 
 import 'dart:convert';
+import 'dart:typed_data';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 
+import '../../core/constants/app_constants.dart';
 import '../../core/constants/cache_keys.dart';
 import '../../core/constants/firestore_paths.dart';
 import '../../core/errors/exceptions.dart';
+import '../datasources/external/drive_image_service.dart';
 import '../datasources/local/hive_service.dart';
 import '../datasources/remote/firestore_service.dart';
 import '../models/user/role_model.dart';
 import '../models/user/user_private_model.dart';
+import '../models/user/work_experience_model.dart'; // ⚠️ NEW (Phase 6)
 
 class UserRepository {
   final FirestoreService _firestoreService;
+  final DriveImageService _driveImageService;
 
-  UserRepository(this._firestoreService);
+  UserRepository(this._firestoreService, this._driveImageService);
 
   /// Architecture §7.1 flow:
   /// "Sign Up → Verify Alumni ID offline → Create Auth Account → Client
@@ -159,6 +166,20 @@ class UserRepository {
     } on FirebaseException catch (e) {
       throw NetworkException('Failed to save your profile: ${e.message}');
     }
+
+    // ⚠️ FIX (root cause of "edited profile still shows old data"):
+    // this method previously committed to Firestore correctly but never
+    // touched the local Hive `my_profile` cache (1h TTL, §6.2). Since
+    // `getMyProfile()` is cache-first, the very next read — even right
+    // after a successful save — could still return stale pre-edit data
+    // for up to an hour. Invalidating a Riverpod provider (as the
+    // calling screens already do) only forces that provider to re-run;
+    // it does NOT clear the underlying Hive entry, so the re-run just
+    // read the same stale cache again. Writing the fresh data straight
+    // into the cache here closes that gap immediately.
+    await _writeProfileToCache(
+      UserProfileModel.fromMap({...privateData, 'uid': uid, 'ua': now}),
+    );
   }
 
   /// Every field copied unconditionally — Appendix E: "no toggles, no
@@ -239,5 +260,73 @@ class UserRepository {
     } catch (_) {
       return null; // corrupted cache entry — treat as a miss, not a crash
     }
+  }
+
+  /// Architecture Appendix J.4 — pick→compress→upload→update `purl` flow
+  /// (compression itself happens in the calling screen, Phase 6, via
+  /// `flutter_image_compress`; this method receives already-compressed
+  /// bytes so the repository stays free of UI-adjacent image-processing
+  /// concerns).
+  ///
+  /// ⚠️ FIX (promised earlier when the Sheets-structure question came up,
+  /// implemented now): Appendix J.4's original code mints a brand-new
+  /// timestamped filename on every upload and NEVER deletes the previous
+  /// photo's Drive file — silently accumulating orphaned files forever.
+  /// This version accepts the caller's current `oldFileId` and deletes it
+  /// AFTER the new photo is safely referenced everywhere (users_private +
+  /// users_public), so a failure partway through this method never leaves
+  /// the profile pointing at an already-deleted fileId.
+  Future<String> uploadProfilePhoto({
+    required String uid,
+    required Uint8List compressedBytes,
+    String? oldFileId,
+  }) async {
+    if (compressedBytes.length > AppConstants.maxPhotoBytes) {
+      throw const ValidationException(
+          'Image is still too large after compression.');
+    }
+
+    final newFileId = await _driveImageService.uploadImage(
+      bytes: compressedBytes,
+      filename: 'profile_${uid}_${DateTime.now().millisecondsSinceEpoch}',
+      mimeType: 'image/jpeg',
+    );
+
+    final privateSnap =
+        await _firestoreService.getDoc('${FirestorePaths.usersPrivate}/$uid');
+    final privateData = privateSnap.data();
+    if (privateData == null) {
+      throw const NetworkException('Profile not found while updating photo.');
+    }
+    await syncUserPublic(
+        uid: uid, privateData: {...privateData, 'purl': newFileId});
+
+    if (oldFileId != null && oldFileId.isNotEmpty && oldFileId != newFileId) {
+      await _driveImageService.deleteImage(oldFileId);
+    }
+
+    return newFileId;
+  }
+
+  /// Used by Profile Detail's "+ Add Work Experience" (own profile only,
+  /// Architecture Appendix F.7.5) — persists immediately rather than
+  /// waiting for a full Profile Edit save, since Detail lets an alumnus
+  /// add one entry on the spot without navigating to the Edit screen.
+  Future<void> updateWorkExperience(
+      String uid, List<WorkExperience> workExperience) async {
+    final snap =
+        await _firestoreService.getDoc('${FirestorePaths.usersPrivate}/$uid');
+    final privateData = snap.data();
+    if (privateData == null) {
+      throw const NetworkException(
+          'Profile not found while updating work experience.');
+    }
+    await syncUserPublic(
+      uid: uid,
+      privateData: {
+        ...privateData,
+        'wx': workExperience.map((w) => w.toMap()).toList(),
+      },
+    );
   }
 }

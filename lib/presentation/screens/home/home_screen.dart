@@ -24,9 +24,12 @@ import '../../../core/utils/departments_helper.dart';
 import '../../../data/models/job/job_post_model.dart';
 import '../../../data/models/system/system_stats_model.dart';
 import '../../../data/models/user/user_public_model.dart';
+import '../../providers/auth_provider.dart'; // ⚠️ NEW (Phase 6) — currentUidProvider
 import '../../providers/dashboard_provider.dart';
 import '../../widgets/charts/career_status_donut_chart.dart';
 import '../directory/directory_screen.dart'; // ⚠️ NEW (Phase 5) — replaces the placeholder
+import '../profile/profile_detail_screen.dart'; // ⚠️ NEW (Phase 6)
+import '../splash/splash_screen.dart'; // ⚠️ NEW — logout routes back through Splash
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -105,6 +108,17 @@ class _DashboardTab extends ConsumerWidget {
             backgroundColor: theme.colorScheme.primary,
             foregroundColor: Colors.white,
             title: const Text('JTECAA'),
+            // ⚠️ NEW — there is currently no Side Drawer (Phase 10 will
+            // add "Settings > Logout" there properly). Without this,
+            // there was genuinely no way to sign out from the Alumni
+            // shell at all — a real gap for testing, not a cosmetic one.
+            actions: [
+              IconButton(
+                icon: const Icon(Icons.logout),
+                tooltip: 'Logout',
+                onPressed: () => _confirmLogout(context, ref),
+              ),
+            ],
           ),
           SliverToBoxAdapter(child: _buildGreetingCard(context, ref)),
           SliverToBoxAdapter(child: _buildStatsSection(context, ref)),
@@ -119,58 +133,73 @@ class _DashboardTab extends ConsumerWidget {
   Widget _buildGreetingCard(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
     final profileAsync = ref.watch(myAlumniProfileProvider);
+    // ⚠️ NEW (Phase 6): tapping the greeting card opens the signed-in
+    // Alumni's own Profile Detail — there is currently no Side Drawer
+    // (Phase 10) or other nav entry point to reach "My Profile" from this
+    // shell, so this card doubles as that entry point for now.
+    final myUid = ref.watch(currentUidProvider);
 
-    return Container(
-      margin: const EdgeInsets.fromLTRB(16, 16, 16, 0),
-      padding: const EdgeInsets.all(24),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [
-            theme.colorScheme.primary,
-            theme.colorScheme.primary.withValues(alpha: 0.85)
-          ],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: BorderRadius.circular(20),
-      ),
-      child: profileAsync.when(
-        loading: () => const SizedBox(
-          height: 60,
-          child: Center(child: CircularProgressIndicator(color: Colors.white)),
-        ),
-        error: (e, st) => Text(
-          'Could not load your profile.',
-          style: theme.textTheme.bodyMedium?.copyWith(color: Colors.white),
-        ),
-        data: (profile) => Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Good day, ${profile.firstName}',
-              style:
-                  theme.textTheme.headlineSmall?.copyWith(color: Colors.white),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              '${profile.batch} • ${Departments.getShortLabel(profile.department)}',
-              style: theme.textTheme.bodyMedium
-                  ?.copyWith(color: Colors.white.withValues(alpha: 0.8)),
-            ),
-            const SizedBox(height: 12),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-              decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.2),
-                borderRadius: BorderRadius.circular(12),
+    return GestureDetector(
+      onTap: myUid == null
+          ? null
+          : () => Navigator.of(context).push(
+                MaterialPageRoute(
+                    builder: (_) => ProfileDetailScreen(uid: myUid)),
               ),
-              child: Text(
-                profile.careerStatus,
-                style:
-                    theme.textTheme.labelSmall?.copyWith(color: Colors.white),
+      child: Container(
+        margin: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+        padding: const EdgeInsets.all(24),
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            colors: [
+              theme.colorScheme.primary,
+              theme.colorScheme.primary.withValues(alpha: 0.85)
+            ],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+          borderRadius: BorderRadius.circular(20),
+        ),
+        child: profileAsync.when(
+          loading: () => const SizedBox(
+            height: 60,
+            child:
+                Center(child: CircularProgressIndicator(color: Colors.white)),
+          ),
+          error: (e, st) => Text(
+            'Could not load your profile.',
+            style: theme.textTheme.bodyMedium?.copyWith(color: Colors.white),
+          ),
+          data: (profile) => Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Good day, ${profile.firstName}',
+                style: theme.textTheme.headlineSmall
+                    ?.copyWith(color: Colors.white),
               ),
-            ),
-          ],
+              const SizedBox(height: 4),
+              Text(
+                '${profile.batch} • ${Departments.getShortLabel(profile.department)}',
+                style: theme.textTheme.bodyMedium
+                    ?.copyWith(color: Colors.white.withValues(alpha: 0.8)),
+              ),
+              const SizedBox(height: 12),
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.2),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Text(
+                  profile.careerStatus,
+                  style:
+                      theme.textTheme.labelSmall?.copyWith(color: Colors.white),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -483,7 +512,10 @@ class _RecentAlumniTile extends StatelessWidget {
         maxLines: 1,
         overflow: TextOverflow.ellipsis,
       ),
-      onTap: () => _showComingSoon(context, 'Profile details'),
+      // ⚠️ CHANGED (Phase 6) — was `_showComingSoon(context, 'Profile details')`.
+      onTap: () => Navigator.of(context).push(
+        MaterialPageRoute(builder: (_) => ProfileDetailScreen(uid: alumni.uid)),
+      ),
     );
   }
 }
@@ -519,5 +551,39 @@ class _JobsPlaceholderTab extends StatelessWidget {
 void _showComingSoon(BuildContext context, String feature) {
   ScaffoldMessenger.of(context).showSnackBar(
     SnackBar(content: Text('$feature is coming in a later phase.')),
+  );
+}
+
+/// ⚠️ NEW — temporary Logout entry point (see the SliverAppBar action
+/// above). Confirms before signing out, then routes back through
+/// SplashScreen so its normal "no user -> LoginScreen" logic runs, same
+/// pattern already used by login/signup success paths.
+Future<void> _confirmLogout(BuildContext context, WidgetRef ref) async {
+  final confirmed = await showDialog<bool>(
+    context: context,
+    builder: (ctx) => AlertDialog(
+      title: const Text('Log out?'),
+      content:
+          const Text('You will need to sign in again to access your account.'),
+      actions: [
+        TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel')),
+        TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Log out')),
+      ],
+    ),
+  );
+  if (confirmed != true) {
+    return;
+  }
+  await ref.read(authControllerProvider.notifier).signOut();
+  if (!context.mounted) {
+    return;
+  }
+  Navigator.of(context).pushAndRemoveUntil(
+    MaterialPageRoute(builder: (_) => const SplashScreen()),
+    (route) => false,
   );
 }

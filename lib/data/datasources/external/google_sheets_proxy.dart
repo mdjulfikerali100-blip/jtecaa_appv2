@@ -132,4 +132,36 @@ class GoogleSheetsProxy {
 
   Future<Map<String, dynamic>> deleteNews(String id) =>
       _post('deleteNews', {'id': id});
+
+  // ---------------------------------------------------------------------
+  // IMAGES (Appendix I.7) — profile photos live in Google Drive, served
+  // through this SAME Apps Script deployment (not a separate one) since
+  // Appendix I.7 explicitly adds these functions to the same Code.gs as
+  // Jobs+News. There is no dedicated "Images" spreadsheet — Drive is the
+  // storage, this Web App is purely a CORS-safe proxy in front of it.
+  // ---------------------------------------------------------------------
+
+  /// Appendix I.7.3 `uploadImage` — returns `{fileId, directUrl}`.
+  Future<Map<String, dynamic>> uploadImage({
+    required String base64,
+    required String filename,
+    required String mimeType,
+  }) async {
+    final body = await _post('uploadImage', {
+      'base64': base64,
+      'filename': filename,
+      'mimeType': mimeType,
+    });
+    return body['data'] as Map<String, dynamic>;
+  }
+
+  /// Appendix I.7.3 `getImage` — the Reverse CORS Proxy. Returns
+  /// `{fileId, mimeType, base64, fetchedAt}`.
+  Future<Map<String, dynamic>> getImage(String fileId) async {
+    final body = await _get('getImage', {'fileId': fileId});
+    return body['data'] as Map<String, dynamic>;
+  }
+
+  Future<Map<String, dynamic>> deleteImage(String fileId) =>
+      _post('deleteImage', {'fileId': fileId});
 }

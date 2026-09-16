@@ -49,6 +49,20 @@ class DirectoryRepository {
   CollectionReference<Map<String, dynamic>> get _usersPublic =>
       _firestoreService.collection(FirestorePaths.usersPublic);
 
+  /// Single-document read for Profile Detail (Phase 6) when viewing
+  /// someone ELSE's profile. Not cached — a profile view is a one-off
+  /// read, and adding a whole cache slot per-visited-uid would add
+  /// complexity for a screen the user isn't likely to revisit rapidly.
+  /// Returns null if the alumnus doesn't exist (e.g. a stale deep link).
+  Future<UserPublicModel?> getAlumniByUid(String uid) async {
+    final snap =
+        await _firestoreService.getDoc('${FirestorePaths.usersPublic}/$uid');
+    if (!snap.exists || snap.data() == null) {
+      return null;
+    }
+    return UserPublicModel.fromMap(snap.data()!);
+  }
+
   /// First page (20 alumni, Architecture §10.1). Cache-first — checks
   /// `system/config.uv` before deciding whether the Hive-cached first
   /// page is still valid.

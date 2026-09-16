@@ -14,6 +14,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../data/datasources/external/drive_image_service.dart'; // ⚠️ NEW (Phase 6)
 import '../../data/datasources/external/google_sheets_proxy.dart';
 import '../../data/datasources/external/student_sheets_proxy.dart';
 import '../../data/datasources/remote/firestore_service.dart';
@@ -33,7 +34,10 @@ final firestoreServiceProvider = Provider<FirestoreService>((ref) {
 });
 
 final userRepositoryProvider = Provider<UserRepository>((ref) {
-  return UserRepository(ref.watch(firestoreServiceProvider));
+  // ⚠️ UPDATED (Phase 6) — UserRepository now also needs DriveImageService
+  // for uploadProfilePhoto().
+  return UserRepository(ref.watch(firestoreServiceProvider),
+      ref.watch(driveImageServiceProvider));
 });
 
 final directoryRepositoryProvider = Provider<DirectoryRepository>((ref) {
@@ -53,6 +57,13 @@ final googleSheetsProxyProvider = Provider<GoogleSheetsProxy>((ref) {
 
 final studentSheetsProxyProvider = Provider<StudentSheetsProxy>((ref) {
   return StudentSheetsProxy();
+});
+
+// ⚠️ NEW (Phase 6) — Drive image endpoints (Appendix I.7) live in the
+// SAME Apps Script deployment as Jobs+News, so this depends on
+// googleSheetsProxyProvider rather than its own separate proxy.
+final driveImageServiceProvider = Provider<DriveImageService>((ref) {
+  return DriveImageService(ref.watch(googleSheetsProxyProvider));
 });
 
 final jobRepositoryProvider = Provider<JobRepository>((ref) {

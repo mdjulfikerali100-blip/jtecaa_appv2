@@ -28,6 +28,7 @@ import '../../providers/directory_provider.dart';
 import '../../widgets/common/alumni_directory_card.dart';
 import '../../widgets/common/batch_dropdown_field.dart';
 import '../../widgets/skeletons/directory_skeleton.dart';
+import '../profile/profile_detail_screen.dart'; // ⚠️ NEW (Phase 6)
 
 class DirectoryScreen extends ConsumerStatefulWidget {
   const DirectoryScreen({super.key});
@@ -245,7 +246,15 @@ class _DirectoryScreenState extends ConsumerState<DirectoryScreen> {
               child: Center(child: CircularProgressIndicator()),
             );
           }
-          return AlumniDirectoryCard(alumni: visible[i]);
+          return AlumniDirectoryCard(
+            alumni: visible[i],
+            // ⚠️ NEW (Phase 6) — was unwired (no onTap at all), so tapping
+            // a card previously did nothing.
+            onTap: () => Navigator.of(context).push(
+              MaterialPageRoute(
+                  builder: (_) => ProfileDetailScreen(uid: visible[i].uid)),
+            ),
+          );
         },
       ),
     );
@@ -388,25 +397,30 @@ class _FilterSheetState extends ConsumerState<_FilterSheet> {
                   ],
                   onChanged: (v) => setState(() => _jobDepartment = v),
                 ),
-                const SizedBox(height: 16),
-                Text('Career Status', style: theme.textTheme.titleSmall),
-                const SizedBox(height: 8),
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: CareerStatusCategories.all.map((c) {
-                    final selected = _careerStatus == c;
-                    return ChoiceChip(
-                      label: Text(
-                        CareerStatusCategories.getDisplayLabel(c),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
+                const SizedBox(height: 12),
+                // ⚠️ CHANGED: was a Wrap of ChoiceChips — converted to a
+                // DropdownButtonFormField for consistency with every
+                // other filter in this sheet (Department/Batch/District/
+                // Company Type/Job Department are all dropdowns; having
+                // Career Status alone be chip-based was inconsistent UI).
+                DropdownButtonFormField<String>(
+                  initialValue: _careerStatus,
+                  decoration: const InputDecoration(labelText: 'Career Status'),
+                  items: [
+                    const DropdownMenuItem(
+                        value: null, child: Text('All Career Statuses')),
+                    ...CareerStatusCategories.all.map(
+                      (c) => DropdownMenuItem(
+                        value: c,
+                        child: Text(
+                          CareerStatusCategories.getDisplayLabel(c),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
                       ),
-                      selected: selected,
-                      onSelected: (isSelected) =>
-                          setState(() => _careerStatus = isSelected ? c : null),
-                    );
-                  }).toList(),
+                    ),
+                  ],
+                  onChanged: (v) => setState(() => _careerStatus = v),
                 ),
               ],
             ),

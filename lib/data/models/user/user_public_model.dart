@@ -24,6 +24,22 @@
 //     on Group of Companies / Job Department / past company names, and so
 //     the Total Work Experience badge can be computed on the directory
 //     card without an extra Firestore read.
+//   - skills, bio, experienceYears: ⚠️ SELF-CAUGHT BUG (Phase 6) — these
+//     three fields ARE written to `users_public` by
+//     UserRepository.syncUserPublic() (`sk`/`bio`/`exp`, matching
+//     Architecture §8.2's own code and the §4.2.B schema example), but
+//     this model never parsed them out. Profile Detail (Phase 6) needs
+//     Skills and Bio when viewing someone else's profile via
+//     `users_public`, so they're added now.
+//
+// ⚠️ KNOWN GAP (not fixed here — a genuine Architecture limitation):
+// `doj` (Date of Joining) is written to `users_private` but is NOT
+// copied into `users_public` by Architecture's own §8.2 `_buildPublicMap`
+// code. This means Date of Joining is simply unavailable when viewing
+// someone ELSE's profile — only visible on your OWN profile (read from
+// `users_private` instead). Profile Detail Screen (Phase 6) handles this
+// by omitting that field gracefully for other users' profiles rather
+// than guessing or crashing.
 
 import 'work_experience_model.dart';
 
@@ -47,6 +63,9 @@ class UserPublicModel {
   final String? groupOfCompanies;
   final String? jobDepartment;
   final List<WorkExperience> workExperience;
+  final List<String> skills;
+  final String? bio;
+  final int? experienceYears;
   final int lastUpdated; // unix seconds — `lu` field, Architecture §4.2.B
 
   UserPublicModel({
@@ -69,6 +88,9 @@ class UserPublicModel {
     this.groupOfCompanies,
     this.jobDepartment,
     this.workExperience = const [],
+    this.skills = const [],
+    this.bio,
+    this.experienceYears,
     this.lastUpdated = 0,
   });
 
@@ -99,6 +121,9 @@ class UserPublicModel {
               ?.map((w) => WorkExperience.fromMap(w as Map<String, dynamic>))
               .toList() ??
           [],
+      skills: (map['sk'] as List?)?.cast<String>() ?? [],
+      bio: map['bio'] as String?,
+      experienceYears: map['exp'] as int?,
       lastUpdated: map['lu'] as int? ?? 0,
     );
   }
