@@ -132,7 +132,16 @@ class _ProfileEditFormState extends ConsumerState<_ProfileEditForm> {
     _companyType = p.companyType;
     _jobDepartment = p.jobDepartment;
     _dateOfJoining = p.dateOfJoining;
-    _workExperience = List.of(p.workExperience);
+    // ⚠️ FIX: exclude any ongoing ("current", endDate == null) entry from
+    // the manually-editable list. That entry is now fully governed by the
+    // Current Job Information fields below (see
+    // _buildFinalWorkExperienceList()) — if it were shown here too, a
+    // user editing it directly via the Work Experience section would see
+    // their change silently discarded and overwritten at save time,
+    // which is worse than not offering that edit path at all. Past
+    // (already-ended) entries are unaffected and remain fully editable
+    // here as before.
+    _workExperience = p.workExperience.where((w) => w.endDate != null).toList();
     _skills = List.of(p.skills);
     _photoUrl = p.photoUrl;
   }
@@ -263,11 +272,58 @@ class _ProfileEditFormState extends ConsumerState<_ProfileEditForm> {
     });
   }
 
+  /// ⚠️ NEW — "Perfect solution" fix for the reported gap: `dateOfJoining`
+  /// (Current Job Information) and the `workExperience` list used to be
+  /// two completely unreconciled representations of "what job(s) has
+  /// this person had" — so time spent at the CURRENT position never
+  /// counted toward `WorkExperienceCalculator`'s total, no matter how
+  /// long `dateOfJoining` said they'd been there.
+  ///
+  /// Fix: at every save, the Current Job Information fields are synced
+  /// INTO the Work Experience list as a single ongoing (`endDate: null`)
+  /// entry — replacing any previous ongoing entry first, so there is
+  /// never more than one "current" entry and never a double-count. Past
+  /// (already-ended) entries added via "Add Experience" are untouched.
+  /// The Work Experience list becomes the single source of truth that
+  /// `WorkExperienceCalculator` reads, with zero duplicate data entry
+  /// required from the user.
+  List<WorkExperience> _buildFinalWorkExperienceList() {
+    final list = List<WorkExperience>.from(_workExperience)
+      ..removeWhere((w) => w.endDate == null); // drop any stale "current" entry
+
+    final isCurrentlyEmployed = _careerStatus == 'Job Holder' &&
+        _companyType != null &&
+        _companyController.text.trim().isNotEmpty &&
+        _designationController.text.trim().isNotEmpty &&
+        _jobDepartment != null &&
+        _dateOfJoining != null;
+
+    if (isCurrentlyEmployed) {
+      final joiningDate = DateTime.tryParse(_dateOfJoining!) ?? DateTime.now();
+      list.add(WorkExperience(
+        companyType: _companyType!,
+        groupOfCompanies: _groupController.text.trim().isEmpty
+            ? null
+            : _groupController.text.trim(),
+        companyName: _companyController.text.trim(),
+        designation: _designationController.text.trim(),
+        jobDepartment: _jobDepartment!,
+        startDate: joiningDate,
+        endDate:
+            null, // ongoing — counts toward total experience as "still running"
+      ));
+    }
+
+    return list;
+  }
+
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) {
       return;
     }
     setState(() => _isSaving = true);
+
+    final finalWorkExperience = _buildFinalWorkExperienceList();
 
     final updated = widget.initialProfile.copyWith(
       firstName: _firstNameController.text.toUpperCase(),
@@ -295,7 +351,7 @@ class _ProfileEditFormState extends ConsumerState<_ProfileEditForm> {
           _linkedinController.text.isEmpty ? null : _linkedinController.text,
       facebook:
           _facebookController.text.isEmpty ? null : _facebookController.text,
-      workExperience: _workExperience,
+      workExperience: finalWorkExperience,
       skills: _skills,
       bio: _bioController.text.isEmpty ? null : _bioController.text,
       photoUrl: _photoUrl,
@@ -375,6 +431,7 @@ class _ProfileEditFormState extends ConsumerState<_ProfileEditForm> {
             ),
           ),
           const SizedBox(height: 24),
+
           _sectionHeader(theme, 'Personal Information'),
           TextFormField(
             controller: _firstNameController,
@@ -432,6 +489,7 @@ class _ProfileEditFormState extends ConsumerState<_ProfileEditForm> {
             validator: (v) => v == null ? 'Required' : null,
           ),
           const SizedBox(height: 24),
+
           _sectionHeader(theme, 'Contact Information'),
           TextFormField(
             controller: _phoneController,
@@ -454,6 +512,7 @@ class _ProfileEditFormState extends ConsumerState<_ProfileEditForm> {
             keyboardType: TextInputType.url,
           ),
           const SizedBox(height: 24),
+
           _sectionHeader(theme, 'Current Job Information'),
           DropdownButtonFormField<String>(
             initialValue: _careerStatus,
@@ -517,6 +576,7 @@ class _ProfileEditFormState extends ConsumerState<_ProfileEditForm> {
             },
           ),
           const SizedBox(height: 24),
+
           Row(
             children: [
               Expanded(child: _sectionHeader(theme, 'Work Experience')),
@@ -527,9 +587,21 @@ class _ProfileEditFormState extends ConsumerState<_ProfileEditForm> {
               ),
             ],
           ),
+          // ⚠️ NEW — clarifies the auto-sync behavior so the user doesn't
+          // wonder why their current job isn't listed here for manual
+          // editing: it's driven by the fields above instead.
+          Padding(
+            padding: const EdgeInsets.only(bottom: 8),
+            child: Text(
+              'Your current position (above) is added to your total experience '
+              'automatically — use "Add Experience" only for past, completed jobs.',
+              style: theme.textTheme.bodySmall
+                  ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+            ),
+          ),
           if (_workExperience.isEmpty)
             Text(
-              "No experience added yet. Tap 'Add Experience' to get started.",
+              "No past experience added yet. Tap 'Add Experience' to get started.",
               style: theme.textTheme.bodySmall
                   ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
             )
@@ -558,6 +630,7 @@ class _ProfileEditFormState extends ConsumerState<_ProfileEditForm> {
               );
             }),
           const SizedBox(height: 24),
+
           _sectionHeader(theme, 'Skills'),
           TextField(
             controller: _skillInputController,
@@ -576,6 +649,7 @@ class _ProfileEditFormState extends ConsumerState<_ProfileEditForm> {
                 .toList(),
           ),
           const SizedBox(height: 24),
+
           _sectionHeader(theme, 'About Me'),
           TextFormField(
             controller: _bioController,
@@ -585,6 +659,7 @@ class _ProfileEditFormState extends ConsumerState<_ProfileEditForm> {
                 hintText: 'Tell fellow alumni about yourself...'),
           ),
           const SizedBox(height: 8),
+
           ElevatedButton(
             onPressed: _isSaving ? null : _submit,
             style: ElevatedButton.styleFrom(

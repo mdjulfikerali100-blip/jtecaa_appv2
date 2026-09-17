@@ -312,8 +312,32 @@ class UserRepository {
   /// Architecture Appendix F.7.5) — persists immediately rather than
   /// waiting for a full Profile Edit save, since Detail lets an alumnus
   /// add one entry on the spot without navigating to the Edit screen.
+  ///
+  /// ⚠️ Safety net: at most ONE "ongoing" entry (`endDate == null`) is
+  /// ever persisted, regardless of caller. Profile Edit's own save flow
+  /// (`_buildFinalWorkExperienceList()`) already de-duplicates before
+  /// calling `syncUserPublic()` directly, but Profile Detail's "+ Add"
+  /// goes through THIS method instead — without this guard, a user could
+  /// end up with two simultaneous "current job" entries (one auto-synced
+  /// from Current Job Information, one manually added here), silently
+  /// double-counting that period in `WorkExperienceCalculator`'s total.
+  /// If more than one ongoing entry is ever passed in, only the LAST one
+  /// (most recently added/edited) is kept.
   Future<void> updateWorkExperience(
       String uid, List<WorkExperience> workExperience) async {
+    final deduped = <WorkExperience>[];
+    WorkExperience? lastOngoing;
+    for (final w in workExperience) {
+      if (w.endDate == null) {
+        lastOngoing = w; // keep only the most recent ongoing entry
+      } else {
+        deduped.add(w);
+      }
+    }
+    if (lastOngoing != null) {
+      deduped.add(lastOngoing);
+    }
+
     final snap =
         await _firestoreService.getDoc('${FirestorePaths.usersPrivate}/$uid');
     final privateData = snap.data();
@@ -325,7 +349,7 @@ class UserRepository {
       uid: uid,
       privateData: {
         ...privateData,
-        'wx': workExperience.map((w) => w.toMap()).toList(),
+        'wx': deduped.map((w) => w.toMap()).toList(),
       },
     );
   }
