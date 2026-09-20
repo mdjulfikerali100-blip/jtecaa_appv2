@@ -110,4 +110,36 @@ class JobPostModel {
       'auto_delete_days': '$autoDeleteDays',
     };
   }
+
+  /// Request body shape for `action=editJob` (Appendix I.1's `editJob()`).
+  /// ⚠️ Deliberately does NOT include `posted_by`/`posted_by_name`/
+  /// `posted_by_batch` — the Apps Script `editJob()` function only ever
+  /// updates title/company/description/deadline/apply_* columns for the
+  /// matched row (Appendix I.1's exact code), so the original poster's
+  /// identity is preserved automatically; sending it again would just be
+  /// redundant, not wrong, but omitting it keeps this body's shape an
+  /// honest match of what the endpoint actually consumes.
+  static Map<String, dynamic> toEditBody({
+    required String id,
+    required String title,
+    required String company,
+    String? description,
+    required String deadline,
+    String? applyLink,
+    String? applyEmail,
+    String? applyPhone,
+    String? applyWhatsapp,
+  }) {
+    return {
+      'id': id,
+      'title': title,
+      'company': company,
+      'description': description ?? '',
+      'deadline': deadline,
+      'apply_link': applyLink ?? '',
+      'apply_email': applyEmail ?? '',
+      'apply_phone': applyPhone ?? '',
+      'apply_whatsapp': applyWhatsapp ?? '',
+    };
+  }
 }

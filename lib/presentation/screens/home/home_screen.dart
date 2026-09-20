@@ -27,7 +27,9 @@ import '../../../data/models/user/user_public_model.dart';
 import '../../providers/auth_provider.dart'; // ⚠️ NEW (Phase 6) — currentUidProvider
 import '../../providers/dashboard_provider.dart';
 import '../../widgets/charts/career_status_donut_chart.dart';
+import '../../widgets/common/job_detail_bottom_sheet.dart'; // ⚠️ NEW (Phase 7)
 import '../directory/directory_screen.dart'; // ⚠️ NEW (Phase 5) — replaces the placeholder
+import '../jobs/jobs_screen.dart'; // ⚠️ NEW (Phase 7) — replaces the placeholder
 import '../profile/profile_detail_screen.dart'; // ⚠️ NEW (Phase 6)
 import '../splash/splash_screen.dart'; // ⚠️ NEW — logout routes back through Splash
 
@@ -48,9 +50,12 @@ class _HomeScreenState extends State<HomeScreen> {
     // `_currentIndex` — e.g. from the Donut Chart's segment-tap handler.
     final tabs = <Widget>[
       _DashboardTab(
-          onNavigateToDirectory: () => setState(() => _currentIndex = 1)),
+        onNavigateToDirectory: () => setState(() => _currentIndex = 1),
+        onNavigateToJobs: () =>
+            setState(() => _currentIndex = 2), // ⚠️ NEW (Phase 7)
+      ),
       const DirectoryScreen(), // ⚠️ CHANGED (Phase 5) — was `_DirectoryPlaceholderTab()`
-      const _JobsPlaceholderTab(),
+      const JobsScreen(), // ⚠️ CHANGED (Phase 7) — was `_JobsPlaceholderTab()`
     ];
 
     return Scaffold(
@@ -80,8 +85,10 @@ class _HomeScreenState extends State<HomeScreen> {
 /// The actual Dashboard content (Features 8–11).
 class _DashboardTab extends ConsumerWidget {
   final VoidCallback onNavigateToDirectory;
+  final VoidCallback onNavigateToJobs; // ⚠️ NEW (Phase 7)
 
-  const _DashboardTab({required this.onNavigateToDirectory});
+  const _DashboardTab(
+      {required this.onNavigateToDirectory, required this.onNavigateToJobs});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -285,7 +292,8 @@ class _DashboardTab extends ConsumerWidget {
                     child:
                         Text('Recent Jobs', style: theme.textTheme.titleLarge)),
                 TextButton(
-                  onPressed: () => _showComingSoon(context, 'Job Board'),
+                  onPressed:
+                      onNavigateToJobs, // ⚠️ CHANGED (Phase 7) — was _showComingSoon
                   child: Text('See All',
                       style: TextStyle(color: theme.colorScheme.secondary)),
                 ),
@@ -436,7 +444,16 @@ class _JobPreviewCard extends StatelessWidget {
       height: 160,
       child: Card(
         child: InkWell(
-          onTap: () => _showComingSoon(context, 'Job details'),
+          // ⚠️ CHANGED (Phase 7) — was _showComingSoon(context, 'Job details').
+          // Opens the same JobDetailBottomSheet used by JobsScreen —
+          // matches Architecture §7.7's "detail via bottom sheet" design.
+          onTap: () => showModalBottomSheet(
+            context: context,
+            isScrollControlled: true,
+            shape: const RoundedRectangleBorder(
+                borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+            builder: (_) => JobDetailBottomSheet(job: job),
+          ),
           borderRadius: BorderRadius.circular(16),
           child: Padding(
             padding: const EdgeInsets.all(16),
@@ -515,34 +532,6 @@ class _RecentAlumniTile extends StatelessWidget {
       // ⚠️ CHANGED (Phase 6) — was `_showComingSoon(context, 'Profile details')`.
       onTap: () => Navigator.of(context).push(
         MaterialPageRoute(builder: (_) => ProfileDetailScreen(uid: alumni.uid)),
-      ),
-    );
-  }
-}
-
-/// ⚠️ TEMPORARY — JobsScreen (Phase 7) will replace this.
-class _JobsPlaceholderTab extends StatelessWidget {
-  const _JobsPlaceholderTab();
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Scaffold(
-      appBar: AppBar(title: const Text('Job Board')),
-      body: Center(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(Icons.work_outline,
-                  size: 48, color: theme.colorScheme.onSurfaceVariant),
-              const SizedBox(height: 12),
-              const Text('JobsScreen (Phase 7) will render here.',
-                  textAlign: TextAlign.center),
-            ],
-          ),
-        ),
       ),
     );
   }
