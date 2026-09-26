@@ -26,10 +26,13 @@ import '../../../data/models/system/system_stats_model.dart';
 import '../../../data/models/user/user_public_model.dart';
 import '../../providers/auth_provider.dart'; // ⚠️ NEW (Phase 6) — currentUidProvider
 import '../../providers/dashboard_provider.dart';
+import '../../providers/notification_provider.dart'; // ⚠️ NEW (Phase 9)
 import '../../widgets/charts/career_status_donut_chart.dart';
 import '../../widgets/common/job_detail_bottom_sheet.dart'; // ⚠️ NEW (Phase 7)
 import '../directory/directory_screen.dart'; // ⚠️ NEW (Phase 5) — replaces the placeholder
 import '../jobs/jobs_screen.dart'; // ⚠️ NEW (Phase 7) — replaces the placeholder
+import '../news/news_screen.dart'; // ⚠️ NEW (Phase 8) — temporary AppBar entry point, see note below
+import '../notifications/notifications_screen.dart'; // ⚠️ NEW (Phase 9)
 import '../profile/profile_detail_screen.dart'; // ⚠️ NEW (Phase 6)
 import '../splash/splash_screen.dart'; // ⚠️ NEW — logout routes back through Splash
 
@@ -119,7 +122,53 @@ class _DashboardTab extends ConsumerWidget {
             // add "Settings > Logout" there properly). Without this,
             // there was genuinely no way to sign out from the Alumni
             // shell at all — a real gap for testing, not a cosmetic one.
+            //
+            // ⚠️ NEW (Phase 8, Addendum §1.3/§6): News has no permanent
+            // home in this shell yet either — Appendix F.6.I's bottom nav
+            // spec deliberately excludes News (it's reached via the Side
+            // Drawer, per that same section's "Menu Items: Profile, News,
+            // Settings, Logout"), but that Drawer doesn't exist until
+            // Phase 10. This icon is the same kind of temporary stand-in
+            // as the Logout button above — it goes away, not the feature
+            // behind it, once Phase 10's Side Drawer ships.
+            //
+            // ⚠️ NEW (Phase 9) — the Notifications bell (Feature 28) has
+            // a permanent home here regardless of Phase 10, since an
+            // AppBar bell icon is the standard place for it either way.
             actions: [
+              // ⚠️ NEW (Phase 9, Feature 28) — unread count comes from the
+              // local Hive-backed Notification History (see
+              // fcm_service.dart's header for why it's local, not
+              // Firestore's notification_log).
+              Consumer(
+                builder: (context, ref, _) {
+                  final unreadAsync =
+                      ref.watch(unreadNotificationCountProvider);
+                  final unreadCount = unreadAsync.maybeWhen(
+                    data: (count) => count,
+                    orElse: () => 0,
+                  );
+                  return IconButton(
+                    tooltip: 'Notifications',
+                    onPressed: () => Navigator.of(context).push(
+                      MaterialPageRoute(
+                          builder: (_) => const NotificationsScreen()),
+                    ),
+                    icon: Badge(
+                      isLabelVisible: unreadCount > 0,
+                      label: Text('$unreadCount'),
+                      child: const Icon(Icons.notifications_outlined),
+                    ),
+                  );
+                },
+              ),
+              IconButton(
+                icon: const Icon(Icons.newspaper_outlined),
+                tooltip: 'News & Updates',
+                onPressed: () => Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => const NewsScreen()),
+                ),
+              ),
               IconButton(
                 icon: const Icon(Icons.logout),
                 tooltip: 'Logout',
@@ -535,12 +584,6 @@ class _RecentAlumniTile extends StatelessWidget {
       ),
     );
   }
-}
-
-void _showComingSoon(BuildContext context, String feature) {
-  ScaffoldMessenger.of(context).showSnackBar(
-    SnackBar(content: Text('$feature is coming in a later phase.')),
-  );
 }
 
 /// ⚠️ NEW — temporary Logout entry point (see the SliverAppBar action

@@ -22,6 +22,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'core/theme/app_theme.dart';
 import 'data/datasources/local/hive_service.dart';
+import 'data/datasources/remote/fcm_service.dart'; // ⚠️ NEW (Phase 9)
 import 'firebase_options.dart';
 import 'presentation/screens/splash/splash_screen.dart'; // ⚠️ NEW import
 
@@ -33,6 +34,12 @@ void main() async {
   );
 
   await HiveService.initBoxes();
+
+  // ⚠️ NEW (Phase 9, Appendix L.2.2): registers getInitialMessage /
+  // onMessageOpenedApp / onMessage BEFORE runApp() so a cold-start tap
+  // (app was fully terminated) is caught by getInitialMessage() here,
+  // not missed because the listener was registered too late.
+  await FCMService.init();
 
   runApp(
     const ProviderScope(
@@ -49,6 +56,10 @@ class JTECAAApp extends StatelessWidget {
     return MaterialApp(
       title: 'JTECAA',
       debugShowCheckedModeBanner: false,
+      // ⚠️ NEW (Phase 9) — lets FCMService navigate / open bottom sheets
+      // from a notification tap without a BuildContext passed in from
+      // wherever the message happened to arrive.
+      navigatorKey: FCMService.navigatorKey,
       theme: buildJTECAATheme(),
       darkTheme: buildJTECAADarkTheme(),
       themeMode: ThemeMode.system,
