@@ -49,6 +49,7 @@ dependencies:
   path_provider: ^2.1.0
   connectivity_plus: ^6.0.0          # Network status for offline-first UX
   workmanager: ^0.7.0                # Background sync / cache purge (§H.2)
+  flutter_native_splash: ^2.4.7
 
 dev_dependencies:
   flutter_test:
@@ -59,3 +60,30 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
+
+# ─────────────────────────────────────────────────────────────────────
+# Native Splash Screen Configuration
+# Architecture Appendix F.7.1 — instant navy background + logo before
+# Flutter engine loads, so users never see a white flash on cold start.
+# Regenerate after any change:
+#   dart run flutter_native_splash:create
+# ─────────────────────────────────────────────────────────────────────
+flutter_native_splash:
+  # Brand navy (matches SplashScreen backgroundColor)
+  color: "#1B3A5C"
+
+  # Hide status bar for a truly full-bleed splash moment
+  fullscreen: true
+
+  # Android 12+ (API 31+) uses a new SplashScreen API — the OS auto-
+  # masks the image into a circle, so we set a matching background color
+  # and the icon's circle backdrop to keep it visually seamless.
+  android_12:
+    color: "#1B3A5C"
+    icon_background_color: "#1B3A5C"
+
+  # Target platforms — mobile-only for now (Architecture is mobile-first).
+  # Flip `web: true` later if a web build is ever shipped.
+  android: true
+  ios: true
+  web: true
