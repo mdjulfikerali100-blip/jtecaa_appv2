@@ -576,8 +576,8 @@ class _RecentAlumniTile extends StatelessWidget {
   }
 }
 
-void _showComingSoon(BuildContext context, String feature) {
+/*void _showComingSoon(BuildContext context, String feature) {
   ScaffoldMessenger.of(context).showSnackBar(
     SnackBar(content: Text('$feature is coming in a later phase.')),
   );
-}
+}*/

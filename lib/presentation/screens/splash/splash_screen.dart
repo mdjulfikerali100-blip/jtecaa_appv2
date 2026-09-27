@@ -470,7 +470,7 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
             bottom: 0,
             child: SafeArea(
               top: false,
-              minimum: EdgeInsets.only(bottom: 8),
+              minimum: const EdgeInsets.only(bottom: 8),
               child: Padding(
                 padding: EdgeInsets.only(
                   left: 24 * scale,

@@ -26,7 +26,6 @@ import 'package:http/http.dart' as http;
 import '../../../core/errors/exceptions.dart';
 
 class StudentSheetsProxy {
-  // TODO(Phase 11): replace with the Students spreadsheet's own,
   // independently-deployed Apps Script Web App URL — NOT the same URL as
   // GoogleSheetsProxy's Jobs+News deployment.
   static const String _baseUrl =

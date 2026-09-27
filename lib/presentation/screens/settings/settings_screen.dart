@@ -1,11 +1,11 @@
-/// lib/presentation/screens/settings/settings_screen.dart
-///
-/// Architecture Appendix F.7.9 — Preferences / Account / About / Danger
-/// sections. "Change Password" has no dedicated in-app change-password
-/// screen anywhere in the spec so far, so it's implemented the same way
-/// Forgot Password (Phase 3) already works: send a reset link to the
-/// signed-in user's own email via Firebase Auth, rather than inventing an
-/// unspec'd in-app old/new-password form.
+// lib/presentation/screens/settings/settings_screen.dart
+
+// Architecture Appendix F.7.9 — Preferences / Account / About / Danger
+// sections. "Change Password" has no dedicated in-app change-password
+// screen anywhere in the spec so far, so it's implemented the same way
+// Forgot Password (Phase 3) already works: send a reset link to the
+// signed-in user's own email via Firebase Auth, rather than inventing an
+// unspec'd in-app old/new-password form.
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../providers/auth_provider.dart';

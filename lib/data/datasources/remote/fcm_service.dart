@@ -189,6 +189,7 @@ class FCMService {
       // this static service needing to carry a Riverpod Ref around.
       final data = await GoogleSheetsProxy().getJobById(jobId);
       if (data == null) {
+        if (!context.mounted) return;
         _showSnack(context, 'This job post is no longer available.');
         return;
       }

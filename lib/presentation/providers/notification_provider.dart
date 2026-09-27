@@ -1,7 +1,7 @@
-/// lib/presentation/providers/notification_provider.dart
-///
-/// Riverpod wiring for the local Notification History (see
-/// fcm_service.dart's header for why this is Hive-backed, not Firestore).
+//lib/presentation/providers/notification_provider.dart
+
+//Riverpod wiring for the local Notification History (see
+// fcm_service.dart's header for why this is Hive-backed, not Firestore).
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../data/datasources/remote/fcm_service.dart';
 import '../../data/models/notification/notification_model.dart';

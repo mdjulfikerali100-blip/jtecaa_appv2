@@ -1,9 +1,9 @@
-/// lib/presentation/widgets/common/logout_helper.dart
-///
-/// Extracted from home_screen.dart's original `_confirmLogout()` (Phase 4)
-/// so Side Drawer (Phase 10) and Settings' "Danger Zone: Logout" (Phase
-/// 10) can both call the exact same confirm → sign out → route-to-Splash
-/// flow instead of each screen growing its own slightly-different copy.
+// lib/presentation/widgets/common/logout_helper.dart
+
+// Extracted from home_screen.dart's original `_confirmLogout()` (Phase 4)
+//so Side Drawer (Phase 10) and Settings' "Danger Zone: Logout" (Phase
+//10) can both call the exact same confirm → sign out → route-to-Splash
+// flow instead of each screen growing its own slightly-different copy.
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../providers/auth_provider.dart';

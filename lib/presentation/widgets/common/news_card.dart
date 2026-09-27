@@ -140,7 +140,7 @@ class _NewsCardState extends State<NewsCard> {
                   child: LinearProgressIndicator(
                     value: news.lifeRemainingFraction,
                     minHeight: 4,
-                    backgroundColor: theme.colorScheme.surfaceVariant,
+                    backgroundColor: theme.colorScheme.surfaceContainerHighest,
                     color: news.isExpiringSoon
                         ? const Color(
                             0xFFD97706) // warning, per §F.2 semantic colors

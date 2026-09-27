@@ -1,9 +1,9 @@
-/// lib/presentation/widgets/common/side_drawer.dart
-///
-/// Architecture Appendix F.6.J — "Header: User avatar (64px), Name, Email
-/// (gradient background, 180px). Menu: Profile, News, Settings, Logout."
-/// Alumni shell only — Student shell has its own minimal top bar
-/// (§M.6), no drawer.
+// lib/presentation/widgets/common/side_drawer.dart
+
+// Architecture Appendix F.6.J — "Header: User avatar (64px), Name, Email
+//(gradient background, 180px). Menu: Profile, News, Settings, Logout."
+// Alumni shell only — Student shell has its own minimal top bar
+//(§M.6), no drawer.
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../providers/auth_provider.dart';

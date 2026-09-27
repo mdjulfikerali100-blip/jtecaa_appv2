@@ -1,12 +1,12 @@
-/// lib/presentation/providers/settings_provider.dart
-///
-/// Local device preferences for the Settings screen (Master Prompt
-/// Phase 10, "Preferences: Push Notifications toggle, Dark Mode toggle").
-/// Stored in a small dedicated Hive box (`settings_box`, opened ad hoc
-/// here — same pattern already used for `notif_cache`/`news_cache` in
-/// earlier phases) rather than `shared_preferences`, since that package
-/// isn't in the pubspec dependency list (Appendix H.2) and this app
-/// already leans on Hive for every other piece of local state.
+//lib/presentation/providers/settings_provider.dart
+//
+// Local device preferences for the Settings screen (Master Prompt
+//Phase 10, "Preferences: Push Notifications toggle, Dark Mode toggle").
+// Stored in a small dedicated Hive box (`settings_box`, opened ad hoc
+// here — same pattern already used for `notif_cache`/`news_cache` in
+//earlier phases) rather than `shared_preferences`, since that package
+// isn't in the pubspec dependency list (Appendix H.2) and this app
+// already leans on Hive for every other piece of local state.
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hive_flutter/hive_flutter.dart';
