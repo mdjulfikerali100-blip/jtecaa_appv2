@@ -31,10 +31,9 @@ import '../../widgets/charts/career_status_donut_chart.dart';
 import '../../widgets/common/job_detail_bottom_sheet.dart'; // ⚠️ NEW (Phase 7)
 import '../directory/directory_screen.dart'; // ⚠️ NEW (Phase 5) — replaces the placeholder
 import '../jobs/jobs_screen.dart'; // ⚠️ NEW (Phase 7) — replaces the placeholder
-import '../news/news_screen.dart'; // ⚠️ NEW (Phase 8) — temporary AppBar entry point, see note below
 import '../notifications/notifications_screen.dart'; // ⚠️ NEW (Phase 9)
 import '../profile/profile_detail_screen.dart'; // ⚠️ NEW (Phase 6)
-import '../splash/splash_screen.dart'; // ⚠️ NEW — logout routes back through Splash
+import '../../widgets/common/side_drawer.dart'; // ⚠️ NEW (Phase 10) — replaces the temporary News/Logout icons
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -62,6 +61,9 @@ class _HomeScreenState extends State<HomeScreen> {
     ];
 
     return Scaffold(
+      // ⚠️ NEW (Phase 10) — replaces the temporary News/Logout AppBar
+      // icons (Phase 8/9) with the real Side Drawer (Appendix F.6.J).
+      drawer: const SideDrawer(),
       body: IndexedStack(index: _currentIndex, children: tabs),
       bottomNavigationBar: NavigationBar(
         selectedIndex: _currentIndex,
@@ -118,28 +120,28 @@ class _DashboardTab extends ConsumerWidget {
             backgroundColor: theme.colorScheme.primary,
             foregroundColor: Colors.white,
             title: const Text('JTECAA'),
-            // ⚠️ NEW — there is currently no Side Drawer (Phase 10 will
-            // add "Settings > Logout" there properly). Without this,
-            // there was genuinely no way to sign out from the Alumni
-            // shell at all — a real gap for testing, not a cosmetic one.
-            //
-            // ⚠️ NEW (Phase 8, Addendum §1.3/§6): News has no permanent
-            // home in this shell yet either — Appendix F.6.I's bottom nav
-            // spec deliberately excludes News (it's reached via the Side
-            // Drawer, per that same section's "Menu Items: Profile, News,
-            // Settings, Logout"), but that Drawer doesn't exist until
-            // Phase 10. This icon is the same kind of temporary stand-in
-            // as the Logout button above — it goes away, not the feature
-            // behind it, once Phase 10's Side Drawer ships.
-            //
-            // ⚠️ NEW (Phase 9) — the Notifications bell (Feature 28) has
-            // a permanent home here regardless of Phase 10, since an
-            // AppBar bell icon is the standard place for it either way.
+            // ⚠️ CHANGED (Phase 10) — the Side Drawer (Appendix F.6.J)
+            // now exists, so the menu button below opens it. This
+            // `leading` slot is otherwise auto-filled by Flutter with a
+            // hamburger icon whenever a `Scaffold.drawer` is set, but a
+            // `SliverAppBar` inside a `CustomScrollView` doesn't get that
+            // auto-wiring the way a plain `Scaffold.appBar` does, so it's
+            // wired explicitly here instead.
+            leading: Builder(
+              builder: (context) => IconButton(
+                icon: const Icon(Icons.menu),
+                tooltip: 'Menu',
+                onPressed: () => Scaffold.of(context).openDrawer(),
+              ),
+            ),
+            // ⚠️ CHANGED (Phase 10) — News and Logout were temporary
+            // stand-ins (Phase 8/9) for the Side Drawer that didn't exist
+            // yet (Appendix F.6.J: "Menu: Profile, News, Settings,
+            // Logout"). Both now live in `SideDrawer` instead. The
+            // Notifications bell (Feature 28) keeps its permanent home
+            // here regardless — an AppBar bell icon is the standard place
+            // for it either way, Drawer or not.
             actions: [
-              // ⚠️ NEW (Phase 9, Feature 28) — unread count comes from the
-              // local Hive-backed Notification History (see
-              // fcm_service.dart's header for why it's local, not
-              // Firestore's notification_log).
               Consumer(
                 builder: (context, ref, _) {
                   final unreadAsync =
@@ -161,18 +163,6 @@ class _DashboardTab extends ConsumerWidget {
                     ),
                   );
                 },
-              ),
-              IconButton(
-                icon: const Icon(Icons.newspaper_outlined),
-                tooltip: 'News & Updates',
-                onPressed: () => Navigator.of(context).push(
-                  MaterialPageRoute(builder: (_) => const NewsScreen()),
-                ),
-              ),
-              IconButton(
-                icon: const Icon(Icons.logout),
-                tooltip: 'Logout',
-                onPressed: () => _confirmLogout(context, ref),
               ),
             ],
           ),
@@ -586,36 +576,8 @@ class _RecentAlumniTile extends StatelessWidget {
   }
 }
 
-/// ⚠️ NEW — temporary Logout entry point (see the SliverAppBar action
-/// above). Confirms before signing out, then routes back through
-/// SplashScreen so its normal "no user -> LoginScreen" logic runs, same
-/// pattern already used by login/signup success paths.
-Future<void> _confirmLogout(BuildContext context, WidgetRef ref) async {
-  final confirmed = await showDialog<bool>(
-    context: context,
-    builder: (ctx) => AlertDialog(
-      title: const Text('Log out?'),
-      content:
-          const Text('You will need to sign in again to access your account.'),
-      actions: [
-        TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Cancel')),
-        TextButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('Log out')),
-      ],
-    ),
-  );
-  if (confirmed != true) {
-    return;
-  }
-  await ref.read(authControllerProvider.notifier).signOut();
-  if (!context.mounted) {
-    return;
-  }
-  Navigator.of(context).pushAndRemoveUntil(
-    MaterialPageRoute(builder: (_) => const SplashScreen()),
-    (route) => false,
+void _showComingSoon(BuildContext context, String feature) {
+  ScaffoldMessenger.of(context).showSnackBar(
+    SnackBar(content: Text('$feature is coming in a later phase.')),
   );
 }

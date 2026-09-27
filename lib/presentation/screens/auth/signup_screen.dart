@@ -364,6 +364,7 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
       // ⚠️ Appendix G.2 rule: value is the raw code, child shows the
       // short label — never render the raw department code directly.
       DropdownButtonFormField<String>(
+        isExpanded: true,
         initialValue: _department,
         decoration: const InputDecoration(labelText: 'Department'),
         items: Departments.all
@@ -394,6 +395,7 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
         validator: (v) => (v == null || v.trim().isEmpty) ? 'Required' : null,
       ),
       DropdownButtonFormField<String>(
+        isExpanded: true,
         initialValue: _districtAlumni,
         decoration: const InputDecoration(labelText: 'District'),
         items: Districts.all
@@ -412,6 +414,7 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
       ),
       const SizedBox(height: 12),
       DropdownButtonFormField<String>(
+        isExpanded: true,
         initialValue: _careerStatus,
         decoration: const InputDecoration(labelText: 'Current Status'),
         items: CareerStatusCategories.getDropdownItems(),
@@ -441,6 +444,7 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
       ),
       const SizedBox(height: 12),
       DropdownButtonFormField<String>(
+        isExpanded: true,
         initialValue: _districtStudent,
         decoration: const InputDecoration(labelText: 'District (optional)'),
         items: Districts.all

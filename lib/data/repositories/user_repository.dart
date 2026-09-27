@@ -353,4 +353,37 @@ class UserRepository {
       },
     );
   }
+
+  /// ⚠️ NEW (Phase 10) — Settings' "Delete My Account" (Danger Zone).
+  /// Deletes `users_private` + `users_public`. Deliberately does NOT
+  /// touch `roles/{uid}` — that document's own write-once Security Rule
+  /// (`!exists(...)`, §M.5) makes a delete permission-denied by
+  /// construction (an existing doc always fails `!exists()`), the exact
+  /// same reasoning `role_provider.dart`'s `deleteStudentAccountAndData()`
+  /// already documents for the Student case — it's left to sit unused,
+  /// same as §M.10 accepts there.
+  ///
+  /// ⚠️ REQUIRES A SECURITY RULES UPDATE THIS APP DOESN'T HAVE YET: §9.2's
+  /// rules given so far only grant `allow write` (create/update) on
+  /// `users_private`/`users_public` — there is no `allow delete` clause
+  /// for either collection, so AS WRITTEN TODAY these two `.delete()`
+  /// calls will fail with `permission-denied`. Phase 11's
+  /// `firestore.rules` needs to add `allow delete: if isOwner(uid);` to
+  /// both collections before this method works end-to-end. Flagging this
+  /// now rather than silently shipping a button that always fails.
+  Future<void> deleteMyProfileData(String uid) async {
+    try {
+      await _firestoreService
+          .collection(FirestorePaths.usersPrivate)
+          .doc(uid)
+          .delete();
+      await _firestoreService
+          .collection(FirestorePaths.usersPublic)
+          .doc(uid)
+          .delete();
+    } on FirebaseException catch (e) {
+      throw NetworkException('Failed to delete your profile: ${e.message}');
+    }
+    await HiveService.delete(CacheKeys.myProfileBox, uid);
+  }
 }

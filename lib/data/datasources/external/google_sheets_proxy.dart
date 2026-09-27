@@ -24,15 +24,15 @@ import 'package:http/http.dart' as http;
 import '../../../core/errors/exceptions.dart';
 
 class GoogleSheetsProxy {
-  // TODO(Phase 11): replace with the Jobs+News spreadsheet's Apps Script
   // Web App URL (Appendix I.2, Step 6). This is now a DIFFERENT
   // deployment from the Students sheet (see student_sheets_proxy.dart).
-  static const String _baseUrl = 'YOUR_JOBS_NEWS_WEB_APP_URL_HERE';
+  static const String _baseUrl =
+      'https://script.google.com/macros/s/AKfycbwbol1gcJNpZZSiIZtXNgyEm0Qa4QQnsebbYAWTSZGILQM-FGvWK97J9ANQQMdjVCKS/exec';
 
   static const Duration _timeout = Duration(seconds: 20);
 
-  bool get isConfigured =>
-      !_baseUrl.contains('YOUR_JOBS_NEWS_WEB_APP_URL_HERE');
+  bool get isConfigured => !_baseUrl.contains(
+      'https://script.google.com/macros/s/AKfycbwbol1gcJNpZZSiIZtXNgyEm0Qa4QQnsebbYAWTSZGILQM-FGvWK97J9ANQQMdjVCKS/exec');
 
   Uri _uri(String action, [Map<String, String>? extraParams]) {
     return Uri.parse(_baseUrl).replace(queryParameters: {

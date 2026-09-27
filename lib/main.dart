@@ -24,6 +24,7 @@ import 'core/theme/app_theme.dart';
 import 'data/datasources/local/hive_service.dart';
 import 'data/datasources/remote/fcm_service.dart'; // ⚠️ NEW (Phase 9)
 import 'firebase_options.dart';
+import 'presentation/providers/settings_provider.dart'; // ⚠️ NEW (Phase 10)
 import 'presentation/screens/splash/splash_screen.dart'; // ⚠️ NEW import
 
 void main() async {
@@ -48,11 +49,17 @@ void main() async {
   );
 }
 
-class JTECAAApp extends StatelessWidget {
+class JTECAAApp extends ConsumerWidget {
   const JTECAAApp({super.key});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    // ⚠️ CHANGED (Phase 10) — was `StatelessWidget` + hardcoded
+    // `ThemeMode.system`. Settings' "Dark Mode" switch
+    // (settings_provider.dart) needs somewhere to actually take effect;
+    // watching it here is that one place.
+    final themeMode = ref.watch(themeModeProvider);
+
     return MaterialApp(
       title: 'JTECAA',
       debugShowCheckedModeBanner: false,
@@ -62,7 +69,7 @@ class JTECAAApp extends StatelessWidget {
       navigatorKey: FCMService.navigatorKey,
       theme: buildJTECAATheme(),
       darkTheme: buildJTECAADarkTheme(),
-      themeMode: ThemeMode.system,
+      themeMode: themeMode,
       // ⚠️ FIX (Appendix K.6): clamp text scale factor to prevent
       // overflow when the user's device font-size is set very large.
       builder: (context, child) {
@@ -84,3 +91,4 @@ class JTECAAApp extends StatelessWidget {
     );
   }
 }
+//gonitoprojuktirpathshala@gmail.com

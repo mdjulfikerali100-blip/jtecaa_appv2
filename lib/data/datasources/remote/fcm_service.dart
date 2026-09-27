@@ -75,6 +75,19 @@ class FCMService {
     }
   }
 
+  /// ⚠️ NEW (Phase 10) — Settings' "Push Notifications" toggle, OFF state
+  /// (settings_provider.dart). Unsubscribes from every topic regardless
+  /// of role, the mirror image of `subscribeToRoleTopics()` above.
+  static Future<void> unsubscribeAllTopics() async {
+    if (kIsWeb) {
+      return;
+    }
+    final messaging = FirebaseMessaging.instance;
+    await messaging.unsubscribeFromTopic('all');
+    await messaging.unsubscribeFromTopic('jobs');
+    await messaging.unsubscribeFromTopic('news');
+  }
+
   // -----------------------------------------------------------------
   // Phase 9 — notification-tap handling (Appendix L.2.2)
   // -----------------------------------------------------------------
