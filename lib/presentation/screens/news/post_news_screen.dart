@@ -1,9 +1,17 @@
+// lib/presentation/screens/news/post_news_screen.dart
+//
+// Post / Edit News form — optional cover image (gallery picker +
+// best-effort compression + Drive upload), Title, Body, and an
+// auto-delete window that only applies to new posts.
+
 import 'dart:typed_data';
+
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_image_compress/flutter_image_compress.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
+
 import '../../../data/models/news/news_model.dart';
 import '../../providers/core_providers.dart';
 import '../../providers/news_provider.dart';
@@ -104,19 +112,16 @@ class _PostNewsScreenState extends ConsumerState<PostNewsScreen> {
         _uploadingImage = false;
         _pendingImageBytes = null;
       });
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Image upload failed: $e')),
-      );
+      _showError('Image upload failed: $e');
     }
   }
 
   Future<void> _submit() async {
+    FocusScope.of(context).unfocus();
+
     if (!_formKey.currentState!.validate()) return;
     if (_uploadingImage) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-            content: Text('Please wait for the image to finish uploading')),
-      );
+      _showError('Please wait for the image to finish uploading');
       return;
     }
 
@@ -163,130 +168,536 @@ class _PostNewsScreenState extends ConsumerState<PostNewsScreen> {
     if (ok) {
       Navigator.pop(context);
     } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-            content: Text(_isEditMode
-                ? 'Update failed — try again'
-                : 'Post failed — try again')),
-      );
+      _showError(_isEditMode
+          ? 'Update failed — try again'
+          : 'Post failed — try again');
     }
+  }
+
+  void _showError(String message) {
+    final colorScheme = Theme.of(context).colorScheme;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Row(
+          children: [
+            Icon(Icons.error_outline, color: colorScheme.onErrorContainer),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                message,
+                maxLines: 4,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+          ],
+        ),
+        backgroundColor: colorScheme.errorContainer,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(14),
+        ),
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
 
     return Scaffold(
+      backgroundColor: colorScheme.surface,
       appBar: AppBar(
-        title: Text(_isEditMode ? 'Edit News' : 'Post News'),
+        title: Text(
+          _isEditMode ? 'Edit News' : 'Post News',
+          style: theme.textTheme.titleLarge?.copyWith(
+            color: colorScheme.onSurface,
+            fontWeight: FontWeight.w700,
+          ),
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+        ),
+        centerTitle: false,
+        backgroundColor: colorScheme.surface,
+        foregroundColor: colorScheme.onSurface,
+        surfaceTintColor: Colors.transparent,
+        elevation: 0,
+        scrolledUnderElevation: 0.5,
+        iconTheme: IconThemeData(
+          color: colorScheme.onSurface,
+          size: 24,
+        ),
         actions: [
-          TextButton(
-            onPressed: _saving ? null : _submit,
-            child: _saving
-                ? const SizedBox(
-                    width: 20,
-                    height: 20,
-                    child: CircularProgressIndicator(
-                        strokeWidth: 2, color: Colors.white),
-                  )
-                : const Text('SAVE', style: TextStyle(color: Colors.white)),
+          // ✅ Theme-safe SAVE — was `Colors.white` (invisible in light).
+          Padding(
+            padding: const EdgeInsets.only(right: 8),
+            child: TextButton.icon(
+              onPressed: _saving ? null : _submit,
+              icon: _saving
+                  ? SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: colorScheme.primary,
+                      ),
+                    )
+                  : const Icon(Icons.check_rounded, size: 18),
+              label: Text(
+                _saving ? 'Saving…' : 'Save',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: theme.textTheme.labelLarge?.copyWith(
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: 0.3,
+                ),
+              ),
+              style: TextButton.styleFrom(
+                foregroundColor: colorScheme.primary,
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              ),
+            ),
           ),
         ],
       ),
-      body: Form(
-        key: _formKey,
-        child: ListView(
-          padding: const EdgeInsets.all(16),
-          children: [
-            // Image picker/preview
-            GestureDetector(
-              onTap: _uploadingImage ? null : _pickImage,
-              child: Container(
-                height: 180,
-                width: double.infinity,
-                decoration: BoxDecoration(
-                  color: theme.colorScheme.surfaceContainerHighest,
-                  borderRadius: BorderRadius.circular(12),
+      body: SafeArea(
+        child: Form(
+          key: _formKey,
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final maxContentWidth =
+                  constraints.maxWidth > 640 ? 560.0 : constraints.maxWidth;
+              final bottomInset = MediaQuery.viewInsetsOf(context).bottom;
+
+              return Center(
+                child: ListView(
+                  padding: EdgeInsets.fromLTRB(
+                    constraints.maxWidth > 640 ? 32 : 20,
+                    20,
+                    constraints.maxWidth > 640 ? 32 : 20,
+                    32 + bottomInset,
+                  ),
+                  children: [
+                    ConstrainedBox(
+                      constraints: BoxConstraints(maxWidth: maxContentWidth),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          // ── Section: Cover Image ───────────────────
+                          _SectionHeader(
+                            icon: Icons.image_outlined,
+                            label: 'Cover Image',
+                            trailing: Text(
+                              'Optional',
+                              style: theme.textTheme.labelSmall?.copyWith(
+                                color: colorScheme.onSurfaceVariant,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            textTheme: theme.textTheme,
+                            colorScheme: colorScheme,
+                          ),
+                          const SizedBox(height: 14),
+
+                          _ImagePickerCard(
+                            uploading: _uploadingImage,
+                            pendingBytes: _pendingImageBytes,
+                            fileId: _imageFileId,
+                            onPick: _pickImage,
+                            onRemove: (_pendingImageBytes != null ||
+                                    _imageFileId != null)
+                                ? () => setState(() {
+                                      _pendingImageBytes = null;
+                                      _imageFileId = null;
+                                    })
+                                : null,
+                            colorScheme: colorScheme,
+                            textTheme: theme.textTheme,
+                          ),
+                          const SizedBox(height: 28),
+
+                          // ── Section: Content ───────────────────────
+                          _SectionHeader(
+                            icon: Icons.edit_note_outlined,
+                            label: 'Content',
+                            textTheme: theme.textTheme,
+                            colorScheme: colorScheme,
+                          ),
+                          const SizedBox(height: 14),
+
+                          TextFormField(
+                            controller: _titleController,
+                            textInputAction: TextInputAction.next,
+                            textCapitalization: TextCapitalization.sentences,
+                            decoration: const InputDecoration(
+                              labelText: 'Title',
+                              hintText: 'Headline for this update',
+                              prefixIcon: Icon(Icons.title_rounded),
+                            ),
+                            validator: (v) => (v == null || v.trim().isEmpty)
+                                ? 'Title is required'
+                                : null,
+                          ),
+                          const SizedBox(height: 14),
+                          TextFormField(
+                            controller: _bodyController,
+                            textInputAction: TextInputAction.newline,
+                            textCapitalization: TextCapitalization.sentences,
+                            decoration: const InputDecoration(
+                              labelText: 'Body',
+                              hintText: 'Write the full update here…',
+                              alignLabelWithHint: true,
+                            ),
+                            maxLines: 10,
+                            minLines: 5,
+                            validator: (v) => (v == null || v.trim().isEmpty)
+                                ? 'Body is required'
+                                : null,
+                          ),
+
+                          // ── Section: Post Visibility (create only) ─
+                          if (!_isEditMode) ...[
+                            const SizedBox(height: 28),
+                            _SectionHeader(
+                              icon: Icons.schedule_outlined,
+                              label: 'Visibility',
+                              textTheme: theme.textTheme,
+                              colorScheme: colorScheme,
+                            ),
+                            const SizedBox(height: 14),
+                            DropdownButtonFormField<int>(
+                              initialValue: _autoDeleteDays,
+                              decoration: const InputDecoration(
+                                labelText: 'Auto-delete after',
+                                prefixIcon: Icon(Icons.timer_outlined),
+                              ),
+                              items: const [3, 7, 14, 30]
+                                  .map((d) => DropdownMenuItem(
+                                        value: d,
+                                        child: Text(
+                                          '$d days',
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                      ))
+                                  .toList(),
+                              onChanged: (v) =>
+                                  setState(() => _autoDeleteDays = v ?? 7),
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              'This post will automatically disappear from '
+                              'the News feed after $_autoDeleteDays days.',
+                              style: theme.textTheme.bodySmall?.copyWith(
+                                color: colorScheme.onSurfaceVariant,
+                                height: 1.4,
+                              ),
+                              maxLines: 3,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ],
+                          const SizedBox(height: 24),
+                        ],
+                      ),
+                    ),
+                  ],
                 ),
-                clipBehavior: Clip.antiAlias,
-                child: _buildImagePreview(theme),
+              );
+            },
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// Presentational helpers (no business logic).
+// ─────────────────────────────────────────────────────────────────────────
+
+class _SectionHeader extends StatelessWidget {
+  const _SectionHeader({
+    required this.icon,
+    required this.label,
+    required this.textTheme,
+    required this.colorScheme,
+    this.trailing,
+  });
+
+  final IconData icon;
+  final String label;
+  final TextTheme textTheme;
+  final ColorScheme colorScheme;
+  final Widget? trailing;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Container(
+          padding: const EdgeInsets.all(6),
+          decoration: BoxDecoration(
+            color: colorScheme.primaryContainer.withValues(alpha: 0.55),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Icon(icon, size: 14, color: colorScheme.onPrimaryContainer),
+        ),
+        const SizedBox(width: 10),
+        Flexible(
+          child: Text(
+            label,
+            style: textTheme.titleSmall?.copyWith(
+              color: colorScheme.onSurface,
+              fontWeight: FontWeight.w800,
+              letterSpacing: 0.2,
+            ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ),
+        const SizedBox(width: 12),
+        if (trailing != null)
+          trailing!
+        else
+          Expanded(
+            child: Container(
+              height: 1,
+              color: colorScheme.outlineVariant.withValues(alpha: 0.6),
+            ),
+          ),
+      ],
+    );
+  }
+}
+
+/// Tappable image picker / preview card.
+/// States: empty → pick prompt; uploading → preview + overlay spinner;
+/// set → preview + "Change"/"Remove" chips at the bottom.
+class _ImagePickerCard extends StatelessWidget {
+  const _ImagePickerCard({
+    required this.uploading,
+    required this.pendingBytes,
+    required this.fileId,
+    required this.onPick,
+    required this.onRemove,
+    required this.colorScheme,
+    required this.textTheme,
+  });
+
+  final bool uploading;
+  final Uint8List? pendingBytes;
+  final String? fileId;
+  final VoidCallback onPick;
+  final VoidCallback? onRemove;
+  final ColorScheme colorScheme;
+  final TextTheme textTheme;
+
+  @override
+  Widget build(BuildContext context) {
+    final hasImage = pendingBytes != null || fileId != null;
+
+    return AspectRatio(
+      // 16:9 — natural aspect for a cover image and consistent across
+      // screen sizes (better than a fixed 180px height).
+      aspectRatio: 16 / 9,
+      child: Material(
+        color: Colors.transparent,
+        borderRadius: BorderRadius.circular(16),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: uploading ? null : onPick,
+          child: Container(
+            decoration: BoxDecoration(
+              color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.4),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(
+                color: hasImage
+                    ? colorScheme.outlineVariant
+                    : colorScheme.outlineVariant.withValues(alpha: 0.8),
+                width: 1,
               ),
             ),
-            const SizedBox(height: 20),
-
-            TextFormField(
-              controller: _titleController,
-              decoration: const InputDecoration(labelText: 'Title'),
-              validator: (v) =>
-                  (v == null || v.trim().isEmpty) ? 'Title is required' : null,
+            clipBehavior: Clip.antiAlias,
+            child: Stack(
+              fit: StackFit.expand,
+              children: [
+                _buildContent(hasImage),
+                if (uploading) _uploadingOverlay(),
+                if (hasImage && !uploading)
+                  Positioned(
+                    right: 8,
+                    bottom: 8,
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        _MiniActionChip(
+                          icon: Icons.edit_outlined,
+                          label: 'Change',
+                          colorScheme: colorScheme,
+                          onTap: onPick,
+                        ),
+                        if (onRemove != null) ...[
+                          const SizedBox(width: 6),
+                          _MiniActionChip(
+                            icon: Icons.close_rounded,
+                            label: 'Remove',
+                            colorScheme: colorScheme,
+                            onTap: onRemove!,
+                            destructive: true,
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+              ],
             ),
-            const SizedBox(height: 16),
+          ),
+        ),
+      ),
+    );
+  }
 
-            TextFormField(
-              controller: _bodyController,
-              decoration: const InputDecoration(
-                  labelText: 'Body', alignLabelWithHint: true),
-              maxLines: 8,
-              minLines: 4,
-              validator: (v) =>
-                  (v == null || v.trim().isEmpty) ? 'Body is required' : null,
-            ),
-            const SizedBox(height: 16),
-
-            // Auto-delete days — only meaningful for a new post; the
-            // Apps Script editNews() (§6) never changes this on an edit,
-            // so it's hidden entirely in edit mode rather than shown but
-            // silently ignored.
-            if (!_isEditMode)
-              DropdownButtonFormField<int>(
-                initialValue:
-                    _autoDeleteDays, // ⚠️ K.5 — `value:` is deprecated (Addendum §3.9)
-                decoration:
-                    const InputDecoration(labelText: 'Auto-delete after'),
-                items: const [3, 7, 14, 30]
-                    .map((d) =>
-                        DropdownMenuItem(value: d, child: Text('$d days')))
-                    .toList(),
-                onChanged: (v) => setState(() => _autoDeleteDays = v ?? 7),
+  Widget _buildContent(bool hasImage) {
+    if (pendingBytes != null) {
+      return Image.memory(pendingBytes!, fit: BoxFit.cover);
+    }
+    if (fileId != null) {
+      return DriveImage(
+        fileId: fileId!,
+        fit: BoxFit.cover,
+        width: double.infinity,
+      );
+    }
+    // Empty state — pick prompt.
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: colorScheme.primaryContainer.withValues(alpha: 0.5),
+                shape: BoxShape.circle,
               ),
+              child: Icon(
+                Icons.add_photo_alternate_outlined,
+                size: 26,
+                color: colorScheme.onPrimaryContainer,
+              ),
+            ),
+            const SizedBox(height: 12),
+            Text(
+              'Add a cover photo',
+              textAlign: TextAlign.center,
+              style: textTheme.titleSmall?.copyWith(
+                color: colorScheme.onSurface,
+                fontWeight: FontWeight.w700,
+              ),
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+            ),
+            const SizedBox(height: 4),
+            Text(
+              'Optional — tap to choose from gallery',
+              textAlign: TextAlign.center,
+              style: textTheme.bodySmall?.copyWith(
+                color: colorScheme.onSurfaceVariant,
+                height: 1.3,
+              ),
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+            ),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildImagePreview(ThemeData theme) {
-    if (_uploadingImage && _pendingImageBytes != null) {
-      return Stack(
-        fit: StackFit.expand,
-        children: [
-          Image.memory(_pendingImageBytes!, fit: BoxFit.cover),
-          Container(
-            color: Colors.black38,
-            child: const Center(
-              child: CircularProgressIndicator(color: Colors.white),
+  Widget _uploadingOverlay() {
+    return Container(
+      color: Colors.black.withValues(alpha: 0.4),
+      alignment: Alignment.center,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: const [
+          SizedBox(
+            width: 30,
+            height: 30,
+            child: CircularProgressIndicator(
+              strokeWidth: 2.6,
+              color: Colors.white,
+            ),
+          ),
+          SizedBox(height: 10),
+          Text(
+            'Uploading…',
+            style: TextStyle(
+              color: Colors.white,
+              fontWeight: FontWeight.w600,
+              fontSize: 13,
+              letterSpacing: 0.3,
             ),
           ),
         ],
-      );
-    }
-    if (_imageFileId != null) {
-      return DriveImage(
-          fileId: _imageFileId!, fit: BoxFit.cover, width: double.infinity);
-    }
-    return Center(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(Icons.add_photo_alternate_outlined,
-              size: 40, color: theme.colorScheme.onSurfaceVariant),
-          const SizedBox(height: 8),
-          Text(
-            'Add a photo (optional)',
-            style: theme.textTheme.bodyMedium
-                ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+      ),
+    );
+  }
+}
+
+/// Small chip used over the image for Change / Remove actions.
+class _MiniActionChip extends StatelessWidget {
+  const _MiniActionChip({
+    required this.icon,
+    required this.label,
+    required this.colorScheme,
+    required this.onTap,
+    this.destructive = false,
+  });
+
+  final IconData icon;
+  final String label;
+  final ColorScheme colorScheme;
+  final VoidCallback onTap;
+  final bool destructive;
+
+  @override
+  Widget build(BuildContext context) {
+    final bg = destructive
+        ? colorScheme.errorContainer.withValues(alpha: 0.95)
+        : colorScheme.surface.withValues(alpha: 0.95);
+    final fg =
+        destructive ? colorScheme.onErrorContainer : colorScheme.onSurface;
+
+    return Material(
+      color: bg,
+      borderRadius: BorderRadius.circular(10),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(icon, size: 14, color: fg),
+              const SizedBox(width: 5),
+              Text(
+                label,
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                  color: fg,
+                  letterSpacing: 0.2,
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }

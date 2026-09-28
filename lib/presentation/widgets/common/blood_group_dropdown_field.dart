@@ -14,31 +14,44 @@ class BloodGroupDropdownField extends StatelessWidget {
   final ValueChanged<String?> onChanged;
   final String? Function(String?)? validator;
 
+  /// Optional label override — defaults to 'Blood Group'.
+  final String label;
+
+  /// Optional helper text override — defaults to the signup copy.
+  /// Pass `null` to hide the helper entirely (e.g. on a compact form).
+  final String? helperText;
+
   const BloodGroupDropdownField({
     super.key,
     required this.value,
     required this.onChanged,
     this.validator,
+    this.label = 'Blood Group',
+    this.helperText = 'Select for emergency contact purposes',
   });
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
     return DropdownButtonFormField<String>(
       // ⚠️ Same rename + safety note as batch_dropdown_field.dart.
       initialValue: value,
-      decoration: const InputDecoration(
-        labelText: 'Blood Group',
-        prefixIcon: Icon(Icons.bloodtype_outlined),
-        helperText: 'Select for emergency contact purposes',
+      decoration: InputDecoration(
+        labelText: label,
+        prefixIcon: const Icon(Icons.bloodtype_outlined),
+        helperText: helperText,
       ),
       items: BloodGroupHelper.bloodGroups.map((code) {
-        return DropdownMenuItem(
+        return DropdownMenuItem<String>(
           value: code,
+          // Overflow-proof label — never overflows even at 200% text scale.
           child: Text(
             BloodGroupHelper.getDisplayLabel(code),
-            style: const TextStyle(fontSize: 15),
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
+            softWrap: false,
           ),
         );
       }).toList(),
@@ -46,6 +59,23 @@ class BloodGroupDropdownField extends StatelessWidget {
       validator: validator ??
           (val) => (val == null || val.isEmpty) ? 'Select blood group' : null,
       isExpanded: true,
+      // Slightly taller than default 300 — long blood-group lists scroll
+      // less on small devices and fit common screen heights.
+      menuMaxHeight: 400,
+      // Ensure dropdown menu surface reads well in both light & dark
+      // modes without relying on app theme defaults.
+      dropdownColor: colorScheme.surfaceContainerHigh,
+      borderRadius: BorderRadius.circular(14),
+      icon: Icon(
+        Icons.expand_more_rounded,
+        color: colorScheme.onSurfaceVariant,
+      ),
+      // Explicit text style — drop the hardcoded fontSize:15 in favour
+      // of the theme's bodyLarge, so system font scaling (200%) is
+      // respected and light/dark contrast is inherited correctly.
+      style: theme.textTheme.bodyLarge?.copyWith(
+        color: colorScheme.onSurface,
+      ),
     );
   }
 }

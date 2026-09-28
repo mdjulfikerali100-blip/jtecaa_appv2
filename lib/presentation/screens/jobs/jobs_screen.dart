@@ -43,25 +43,42 @@ class _JobsScreenState extends ConsumerState<JobsScreen>
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
+      useSafeArea: true,
+      backgroundColor: Theme.of(context).colorScheme.surface,
       shape: const RoundedRectangleBorder(
-          borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
       builder: (_) => JobDetailBottomSheet(job: job),
     );
   }
 
   Future<void> _confirmDelete(JobPostModel job) async {
+    final colorScheme = Theme.of(context).colorScheme;
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Delete this job post?'),
-        content: Text(job.title),
+        title: const Text(
+          'Delete this job post?',
+          maxLines: 2,
+          overflow: TextOverflow.ellipsis,
+        ),
+        content: Text(
+          job.title,
+          maxLines: 3,
+          overflow: TextOverflow.ellipsis,
+        ),
         actions: [
           TextButton(
-              onPressed: () => Navigator.pop(ctx, false),
-              child: const Text('Cancel')),
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel'),
+          ),
           TextButton(
-              onPressed: () => Navigator.pop(ctx, true),
-              child: const Text('Delete')),
+            onPressed: () => Navigator.pop(ctx, true),
+            style: TextButton.styleFrom(
+              foregroundColor: colorScheme.error,
+            ),
+            child: const Text('Delete'),
+          ),
         ],
       ),
     );
@@ -75,27 +92,100 @@ class _JobsScreenState extends ConsumerState<JobsScreen>
       if (!mounted) {
         return;
       }
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text('Could not delete: $e')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Could not delete: $e',
+            maxLines: 3,
+            overflow: TextOverflow.ellipsis,
+          ),
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(14),
+          ),
+        ),
+      );
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
     return Scaffold(
+      backgroundColor: colorScheme.surface,
       appBar: AppBar(
-        title: const Text('Job Board'),
-        bottom: TabBar(
-          controller: _tabController,
-          tabs: const [Tab(text: 'Active Jobs'), Tab(text: 'My Posts')],
+        title: Text(
+          'Job Board',
+          style: theme.textTheme.titleLarge?.copyWith(
+            color: colorScheme.onSurface,
+            fontWeight: FontWeight.w700,
+          ),
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+        ),
+        centerTitle: false,
+        backgroundColor: colorScheme.surface,
+        foregroundColor: colorScheme.onSurface,
+        surfaceTintColor: Colors.transparent,
+        elevation: 0,
+        scrolledUnderElevation: 0.5,
+        iconTheme: IconThemeData(
+          color: colorScheme.onSurface,
+          size: 24,
+        ),
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(48),
+          child: Container(
+            alignment: Alignment.centerLeft,
+            padding: const EdgeInsets.symmetric(horizontal: 8),
+            child: TabBar(
+              controller: _tabController,
+              isScrollable: false,
+              labelColor: colorScheme.primary,
+              unselectedLabelColor: colorScheme.onSurfaceVariant,
+              labelStyle: theme.textTheme.titleSmall?.copyWith(
+                fontWeight: FontWeight.w700,
+                letterSpacing: 0.2,
+              ),
+              unselectedLabelStyle: theme.textTheme.titleSmall?.copyWith(
+                fontWeight: FontWeight.w500,
+              ),
+              indicatorColor: colorScheme.primary,
+              indicatorWeight: 2.5,
+              indicatorSize: TabBarIndicatorSize.tab,
+              dividerColor: colorScheme.outlineVariant.withValues(alpha: 0.4),
+              tabs: const [
+                Tab(
+                  height: 48,
+                  child: Text(
+                    'Active Jobs',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+                Tab(
+                  height: 48,
+                  child: Text(
+                    'My Posts',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ],
+            ),
+          ),
         ),
       ),
       body: TabBarView(
         controller: _tabController,
         children: [
-          _buildJobList(activeJobsProvider,
-              emptyMessage: 'No active jobs',
-              emptySubtitle: 'Be the first to post!'),
+          _buildJobList(
+            activeJobsProvider,
+            emptyMessage: 'No active jobs',
+            emptySubtitle: 'Be the first to post!',
+          ),
           _buildMyPostsList(),
         ],
       ),
@@ -103,8 +193,19 @@ class _JobsScreenState extends ConsumerState<JobsScreen>
         onPressed: () => Navigator.of(context).push(
           MaterialPageRoute(builder: (_) => const PostJobScreen()),
         ),
-        icon: const Icon(Icons.add),
-        label: const Text('Post Job'),
+        icon: const Icon(Icons.add_rounded),
+        label: Text(
+          'Post Job',
+          style: theme.textTheme.labelLarge?.copyWith(
+            color: colorScheme.onPrimaryContainer,
+            fontWeight: FontWeight.w700,
+          ),
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+        ),
+        backgroundColor: colorScheme.primaryContainer,
+        foregroundColor: colorScheme.onPrimaryContainer,
+        elevation: 2,
       ),
     );
   }
@@ -125,20 +226,10 @@ class _JobsScreenState extends ConsumerState<JobsScreen>
 
     return jobsAsync.when(
       loading: () => const Center(child: CircularProgressIndicator()),
-      error: (e, st) => Center(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text('Could not load jobs: $e', textAlign: TextAlign.center),
-              const SizedBox(height: 12),
-              OutlinedButton(
-                  onPressed: () => ref.invalidate(provider),
-                  child: const Text('Retry')),
-            ],
-          ),
-        ),
+      error: (e, st) => _buildErrorState(
+        message: 'Could not load jobs',
+        error: e,
+        onRetry: () => ref.invalidate(provider),
       ),
       data: (jobs) {
         if (jobs.isEmpty) {
@@ -147,7 +238,7 @@ class _JobsScreenState extends ConsumerState<JobsScreen>
         return RefreshIndicator(
           onRefresh: () async => ref.invalidate(activeJobsProvider),
           child: ListView.builder(
-            padding: const EdgeInsets.symmetric(vertical: 8),
+            padding: const EdgeInsets.fromLTRB(0, 8, 0, 96), // FAB clearance
             itemCount: jobs.length,
             itemBuilder: (context, i) {
               final job = jobs[i];
@@ -158,7 +249,8 @@ class _JobsScreenState extends ConsumerState<JobsScreen>
                 onTap: () => _openDetail(job),
                 onEdit: () => Navigator.of(context).push(
                   MaterialPageRoute(
-                      builder: (_) => PostJobScreen(existingJob: job)),
+                    builder: (_) => PostJobScreen(existingJob: job),
+                  ),
                 ),
                 onDelete: () => _confirmDelete(job),
               );
@@ -175,29 +267,39 @@ class _JobsScreenState extends ConsumerState<JobsScreen>
 
     return jobsAsync.when(
       loading: () => const Center(child: CircularProgressIndicator()),
-      error: (e, st) => Center(child: Text('Could not load your posts: $e')),
+      error: (e, st) => _buildErrorState(
+        message: 'Could not load your posts',
+        error: e,
+        onRetry: () => ref.invalidate(myJobsProvider),
+      ),
       data: (jobs) {
         if (jobs.isEmpty) {
-          return _buildEmptyState("You haven't posted any jobs yet",
-              'Tap "Post Job" to create one');
+          return _buildEmptyState(
+            "You haven't posted any jobs yet",
+            'Tap "Post Job" to create one',
+          );
         }
-        return ListView.builder(
-          padding: const EdgeInsets.symmetric(vertical: 8),
-          itemCount: jobs.length,
-          itemBuilder: (context, i) {
-            final job = jobs[i];
-            final isOwner = myUid != null && job.postedByUid == myUid;
-            return JobCard(
-              job: job,
-              isOwner: isOwner,
-              onTap: () => _openDetail(job),
-              onEdit: () => Navigator.of(context).push(
-                MaterialPageRoute(
-                    builder: (_) => PostJobScreen(existingJob: job)),
-              ),
-              onDelete: () => _confirmDelete(job),
-            );
-          },
+        return RefreshIndicator(
+          onRefresh: () async => ref.invalidate(myJobsProvider),
+          child: ListView.builder(
+            padding: const EdgeInsets.fromLTRB(0, 8, 0, 96), // FAB clearance
+            itemCount: jobs.length,
+            itemBuilder: (context, i) {
+              final job = jobs[i];
+              final isOwner = myUid != null && job.postedByUid == myUid;
+              return JobCard(
+                job: job,
+                isOwner: isOwner,
+                onTap: () => _openDetail(job),
+                onEdit: () => Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => PostJobScreen(existingJob: job),
+                  ),
+                ),
+                onDelete: () => _confirmDelete(job),
+              );
+            },
+          ),
         );
       },
     );
@@ -205,28 +307,144 @@ class _JobsScreenState extends ConsumerState<JobsScreen>
 
   Widget _buildEmptyState(String message, String subtitle) {
     final theme = Theme.of(context);
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(Icons.work_off,
-                size: 64, color: theme.colorScheme.onSurfaceVariant),
-            const SizedBox(height: 16),
-            Text(message,
-                style: theme.textTheme.titleMedium,
-                textAlign: TextAlign.center),
-            const SizedBox(height: 4),
-            Text(
-              subtitle,
-              style: theme.textTheme.bodySmall
-                  ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
-              textAlign: TextAlign.center,
+    final colorScheme = theme.colorScheme;
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        return SingleChildScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          child: ConstrainedBox(
+            constraints: BoxConstraints(minHeight: constraints.maxHeight),
+            child: Center(
+              child: Padding(
+                padding: const EdgeInsets.all(32),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(20),
+                      decoration: BoxDecoration(
+                        color: colorScheme.surfaceContainerHighest
+                            .withValues(alpha: 0.5),
+                        shape: BoxShape.circle,
+                      ),
+                      child: Icon(
+                        Icons.work_off_outlined,
+                        size: 40,
+                        color: colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+                    Text(
+                      message,
+                      style: theme.textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w700,
+                        color: colorScheme.onSurface,
+                      ),
+                      textAlign: TextAlign.center,
+                      maxLines: 3,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      subtitle,
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        color: colorScheme.onSurfaceVariant,
+                        height: 1.4,
+                      ),
+                      textAlign: TextAlign.center,
+                      maxLines: 3,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
+                ),
+              ),
             ),
-          ],
-        ),
-      ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildErrorState({
+    required String message,
+    required Object error,
+    required VoidCallback onRetry,
+  }) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        return SingleChildScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          child: ConstrainedBox(
+            constraints: BoxConstraints(minHeight: constraints.maxHeight),
+            child: Center(
+              child: Padding(
+                padding: const EdgeInsets.all(32),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(20),
+                      decoration: BoxDecoration(
+                        color:
+                            colorScheme.errorContainer.withValues(alpha: 0.5),
+                        shape: BoxShape.circle,
+                      ),
+                      child: Icon(
+                        Icons.error_outline_rounded,
+                        size: 40,
+                        color: colorScheme.onErrorContainer,
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+                    Text(
+                      message,
+                      style: theme.textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w700,
+                        color: colorScheme.onSurface,
+                      ),
+                      textAlign: TextAlign.center,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      error.toString(),
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: colorScheme.onSurfaceVariant,
+                        height: 1.4,
+                      ),
+                      textAlign: TextAlign.center,
+                      maxLines: 4,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 20),
+                    OutlinedButton.icon(
+                      onPressed: onRetry,
+                      icon: const Icon(Icons.refresh_rounded, size: 18),
+                      label: const Text('Retry'),
+                      style: OutlinedButton.styleFrom(
+                        minimumSize: const Size(120, 44),
+                        side: BorderSide(
+                          color: colorScheme.outline,
+                          width: 1.2,
+                        ),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        foregroundColor: colorScheme.onSurface,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        );
+      },
     );
   }
 }

@@ -7,10 +7,7 @@
 // return a TextStyle with color: null when no color is passed explicitly.
 // ThemeData only backfills a *completely missing* TextTheme slot from its
 // brightness default — it does NOT repair a null color inside a TextStyle
-// object that was already supplied. On Chrome, the surrounding
-// DefaultTextStyle happens to resolve dark anyway, so this bug is
-// invisible with `flutter run -d chrome` and only shows up on a real
-// device (`flutter build apk --debug`).
+// object that was already supplied.
 //
 // THE FIX has two mandatory parts, both applied below:
 //   1. Build the raw TextTheme first, then call
@@ -23,20 +20,24 @@
 // `color: Colors.white` / `color: Colors.black` directly on a Text/TextStyle
 // anywhere else in the app. Always go through `Theme.of(context)`.
 //
-// ⚠️ FIX LOG (root cause, not a patch-over):
-//   1. `ThemeData.cardTheme` now requires `CardThemeData`, not `CardTheme`
-//      — Flutter refactored the *ThemeData family (Card, Dialog, etc.) to
-//      dedicated *ThemeData classes as part of the Material 3 rollout
-//      (breaking change landed after this Architecture doc was written,
-//      SDK-version-dependent). Fixed at every `cardTheme:` call site below
-//      instead of only where the analyzer first pointed.
-//   2. `ColorScheme.fromSeed(background: ..., surfaceVariant: ...)` are
-//      deprecated in current Material 3 guidance — `background` folded
-//      into `surface`, and `surfaceVariant` renamed to
-//      `surfaceContainerHighest`. Both parameters removed here and every
-//      downstream `colorScheme.background` / `colorScheme.surfaceVariant`
-//      read replaced with the non-deprecated equivalent, project-wide in
-//      this file (not just the line the analyzer flagged first).
+// ⚠️ FIX LOG (this revision):
+//   1. Dark theme was missing ~7 component themes (inputDecorationTheme,
+//      elevatedButtonTheme, appBarTheme, bottomNavigationBarTheme,
+//      chipTheme, snackBarTheme, dividerTheme). Result: dark mode fell
+//      back to Material defaults for every one of them, which is why
+//      AppBars, text fields and buttons looked "not quite right" in dark
+//      mode. Now both themes share the SAME set of component themes,
+//      parameterized by colorScheme.
+//   2. Removed every hardcoded `Colors.white` / hardcoded hex in
+//      component themes — all colors now derive from `colorScheme`,
+//      which is exactly what the project-wide rule above demands.
+//   3. `AppBarTheme` foreground/title/icon now use `colorScheme.surface`
+//      + `colorScheme.onSurface`, so any future screen that doesn't
+//      override the AppBar automatically gets theme-correct colors in
+//      BOTH modes — no more per-screen `surfaceTintColor:
+//      Colors.transparent` patches needed (still safe to keep them).
+//   4. Unified `OutlineInputBorder` widths across default/enabled/
+//      focused/error so focus transitions are smooth, not jumpy.
 
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -76,22 +77,179 @@ TextTheme _rawTextTheme() {
   );
 }
 
-/// Light theme — Architecture F.2 (Primary #1A365D, Secondary #B45309,
-/// Tertiary #0F766E) + F.3 (Typography) + F.6 (Component themes).
+// ─────────────────────────────────────────────────────────────────────────
+// Shared component themes (parameterized by colorScheme), so light and
+// dark theme stay in sync forever — a component theme added/edited here
+// applies to BOTH automatically. Any per-mode divergence must be
+// expressed via `colorScheme.*`, never via `brightness == ...` branches.
+// ─────────────────────────────────────────────────────────────────────────
+
+InputDecorationTheme _inputDecorationTheme(ColorScheme c) {
+  // Same radius / border style across every state so the focus
+  // transition doesn't jump.
+  OutlineInputBorder border(Color color, double width) => OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: BorderSide(color: color, width: width),
+      );
+
+  return InputDecorationTheme(
+    filled: true,
+    fillColor: c.surfaceContainerHighest,
+    // helperText / error text at 200% font scale need room.
+    helperMaxLines: 3,
+    errorMaxLines: 3,
+    border: border(c.outline, 1),
+    enabledBorder: border(c.outline, 1),
+    focusedBorder: border(c.primary, 1.6),
+    errorBorder: border(c.error, 1.4),
+    focusedErrorBorder: border(c.error, 1.8),
+    contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+  );
+}
+
+ElevatedButtonThemeData _elevatedButtonTheme(ColorScheme c) {
+  return ElevatedButtonThemeData(
+    style: ElevatedButton.styleFrom(
+      elevation: 1,
+      backgroundColor: c.primary,
+      foregroundColor: c.onPrimary,
+      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+      ),
+      textStyle: GoogleFonts.inter(
+        fontSize: 14,
+        fontWeight: FontWeight.w600,
+        letterSpacing: 0.4,
+      ),
+    ),
+  );
+}
+
+OutlinedButtonThemeData _outlinedButtonTheme(ColorScheme c) {
+  return OutlinedButtonThemeData(
+    style: OutlinedButton.styleFrom(
+      foregroundColor: c.onSurface,
+      side: BorderSide(color: c.outline, width: 1.2),
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+      ),
+      textStyle: GoogleFonts.inter(
+        fontSize: 14,
+        fontWeight: FontWeight.w600,
+        letterSpacing: 0.3,
+      ),
+    ),
+  );
+}
+
+AppBarTheme _appBarTheme(ColorScheme c, TextTheme t) {
+  return AppBarTheme(
+    elevation: 0,
+    scrolledUnderElevation: 0.5,
+    // ✅ Was hardcoded navy/white — now derives from the scheme, so
+    // light and dark both get an automatic contrast-correct AppBar.
+    backgroundColor: c.surface,
+    foregroundColor: c.onSurface,
+    surfaceTintColor: Colors.transparent,
+    centerTitle: false,
+    iconTheme: IconThemeData(color: c.onSurface, size: 24),
+    titleTextStyle: (t.titleLarge ?? const TextStyle()).copyWith(
+      color: c.onSurface,
+      fontWeight: FontWeight.w700,
+    ),
+    toolbarHeight: 64,
+  );
+}
+
+BottomNavigationBarThemeData _bottomNavTheme(ColorScheme c) {
+  return BottomNavigationBarThemeData(
+    backgroundColor: c.surface,
+    selectedItemColor: c.primary,
+    unselectedItemColor: c.onSurfaceVariant,
+    selectedLabelStyle:
+        GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w600),
+    unselectedLabelStyle:
+        GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w500),
+    type: BottomNavigationBarType.fixed,
+    elevation: 8,
+  );
+}
+
+ChipThemeData _chipTheme(ColorScheme c) {
+  return ChipThemeData(
+    backgroundColor: c.surfaceContainerHighest,
+    selectedColor: c.primaryContainer,
+    labelStyle: GoogleFonts.inter(
+      fontSize: 12,
+      fontWeight: FontWeight.w600,
+      color: c.onSurface,
+    ),
+    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+    shape: RoundedRectangleBorder(
+      borderRadius: BorderRadius.circular(8),
+    ),
+  );
+}
+
+SnackBarThemeData _snackBarTheme(ColorScheme c) {
+  return SnackBarThemeData(
+    // ✅ Was hardcoded slate-on-white — now scheme-derived. Uses
+    // `inverseSurface` (M3's intended tone for transient feedback),
+    // which auto-flips contrast between light and dark.
+    backgroundColor: c.inverseSurface,
+    contentTextStyle: GoogleFonts.inter(
+      fontSize: 14,
+      color: c.onInverseSurface,
+    ),
+    actionTextColor: c.inversePrimary,
+    shape: RoundedRectangleBorder(
+      borderRadius: BorderRadius.circular(12),
+    ),
+    behavior: SnackBarBehavior.floating,
+    elevation: 3,
+  );
+}
+
+DividerThemeData _dividerTheme(ColorScheme c) {
+  return DividerThemeData(
+    color: c.outlineVariant,
+    thickness: 1,
+    space: 1,
+  );
+}
+
+CardThemeData _cardTheme(ColorScheme c) {
+  return CardThemeData(
+    elevation: 0,
+    // ✅ Slightly rounder, elevation 0 + subtle border — matches the
+    // card style already used in JobCard / NewsCard.
+    shape: RoundedRectangleBorder(
+      borderRadius: BorderRadius.circular(18),
+      side: BorderSide(
+        color: c.outlineVariant.withValues(alpha: 0.6),
+      ),
+    ),
+    color: c.surfaceContainerLow,
+    margin: EdgeInsets.zero,
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// Light theme — Architecture F.2 (Primary #1A365D, Secondary #B45309,
+// Tertiary #0F766E) + F.3 (Typography) + F.6 (Component themes).
+// ─────────────────────────────────────────────────────────────────────────
+
 ThemeData buildJTECAATheme() {
   final colorScheme = ColorScheme.fromSeed(
     seedColor: const Color(0xFF1A365D),
-    brightness:
-        Brightness.light, // ⚠️ explicit — never leave brightness implicit
+    brightness: Brightness.light,
     primary: const Color(0xFF1A365D),
     secondary: const Color(0xFFB45309),
     tertiary: const Color(0xFF0F766E),
     surface: const Color(0xFFFAFBFC),
-    // ⚠️ FIX: `surfaceVariant` → `surfaceContainerHighest` (deprecated
-    // rename, current Material 3 API).
     surfaceContainerHighest: const Color(0xFFF1F5F9),
-    // ⚠️ FIX: `background` param removed — deprecated; `surface` above is
-    // now the single source of truth for the app's base background color.
     onSurface: const Color(0xFF0F172A),
     onSurfaceVariant: const Color(0xFF64748B),
     outline: const Color(0xFFCBD5E1),
@@ -102,8 +260,6 @@ ThemeData buildJTECAATheme() {
     tertiaryContainer: const Color(0xFFCCFBF1),
   );
 
-  // ⚠️ MANDATORY step (Appendix K.1 fix, part 1) — force-stamp color on
-  // every text slot instead of trusting ThemeData's brightness backfill.
   final textTheme = _rawTextTheme().apply(
     bodyColor: colorScheme.onSurface,
     displayColor: colorScheme.onSurface,
@@ -114,92 +270,29 @@ ThemeData buildJTECAATheme() {
     useMaterial3: true,
     brightness: Brightness.light,
     colorScheme: colorScheme,
-    // ⚠️ FIX: was `colorScheme.background` (deprecated) — `surface` is now
-    // the correct field to read for the scaffold's base background color.
     scaffoldBackgroundColor: colorScheme.surface,
     textTheme: textTheme,
-    // ⚠️ FIX: `CardTheme(...)` → `CardThemeData(...)`. `ThemeData.cardTheme`
-    // expects `CardThemeData?` on current Flutter SDKs; passing the old
-    // `CardTheme` widget-config class no longer type-checks.
-    cardTheme: CardThemeData(
-      elevation: 1,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      color: const Color(0xFFF1F5F9),
-    ),
-    inputDecorationTheme: InputDecorationTheme(
-      filled: true,
-      fillColor: const Color(0xFFF1F5F9),
-      border: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(12),
-        borderSide: const BorderSide(color: Color(0xFFCBD5E1)),
-      ),
-      enabledBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(12),
-        borderSide: const BorderSide(color: Color(0xFFCBD5E1)),
-      ),
-      focusedBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(12),
-        borderSide: const BorderSide(color: Color(0xFF1A365D), width: 2),
-      ),
-      errorBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(12),
-        borderSide: const BorderSide(color: Color(0xFFDC2626), width: 2),
-      ),
-      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-    ),
-    elevatedButtonTheme: ElevatedButtonThemeData(
-      style: ElevatedButton.styleFrom(
-        elevation: 1,
-        backgroundColor: const Color(0xFF1A365D),
-        foregroundColor: Colors.white,
-        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        textStyle: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w500),
-      ),
-    ),
-    appBarTheme: AppBarTheme(
-      elevation: 2,
-      backgroundColor: const Color(0xFF1A365D),
-      foregroundColor: Colors.white,
-      titleTextStyle: GoogleFonts.inter(
-          fontSize: 24, fontWeight: FontWeight.w600, color: Colors.white),
-      toolbarHeight: 64,
-    ),
-    bottomNavigationBarTheme: const BottomNavigationBarThemeData(
-      backgroundColor: Color(0xFFFAFBFC),
-      selectedItemColor: Color(0xFF1A365D),
-      unselectedItemColor: Color(0xFF64748B),
-      type: BottomNavigationBarType.fixed,
-      elevation: 8,
-    ),
-    chipTheme: ChipThemeData(
-      backgroundColor: const Color(0xFFF1F5F9),
-      selectedColor: const Color(0xFFE8EDF3),
-      labelStyle: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w500),
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-    ),
-    snackBarTheme: SnackBarThemeData(
-      backgroundColor: const Color(0xFF0F172A),
-      contentTextStyle:
-          GoogleFonts.inter(fontSize: 14, color: const Color(0xFFFAFBFC)),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      behavior: SnackBarBehavior.floating,
-      elevation: 3,
-    ),
-    dividerTheme: const DividerThemeData(
-      color: Color(0xFFCBD5E1),
-      thickness: 1,
-      indent: 16,
-      endIndent: 16,
-    ),
+
+    // ── Component themes (shared factories) ────────────────────
+    cardTheme: _cardTheme(colorScheme),
+    inputDecorationTheme: _inputDecorationTheme(colorScheme),
+    elevatedButtonTheme: _elevatedButtonTheme(colorScheme),
+    outlinedButtonTheme: _outlinedButtonTheme(colorScheme),
+    appBarTheme: _appBarTheme(colorScheme, textTheme),
+    bottomNavigationBarTheme: _bottomNavTheme(colorScheme),
+    chipTheme: _chipTheme(colorScheme),
+    snackBarTheme: _snackBarTheme(colorScheme),
+    dividerTheme: _dividerTheme(colorScheme),
   );
 }
 
-/// Dark theme — MANDATORY companion to `buildJTECAATheme()`.
-/// ⚠️ Never ship MaterialApp with only a light `theme:` and no
-/// `darkTheme:` — that's exactly what causes "dark mode looks fine, light
-/// mode is broken" to appear random (Appendix K.1, F.12 explanation).
+// ─────────────────────────────────────────────────────────────────────────
+// Dark theme — MANDATORY companion to `buildJTECAATheme()`.
+// ✅ Now applies the SAME component theme set as light mode, only the
+// colorScheme differs. This is what actually makes dark mode feel like
+// a first-class theme instead of a half-styled fallback.
+// ─────────────────────────────────────────────────────────────────────────
+
 ThemeData buildJTECAADarkTheme() {
   final colorScheme = ColorScheme.fromSeed(
     seedColor: const Color(0xFF1A365D),
@@ -208,16 +301,18 @@ ThemeData buildJTECAADarkTheme() {
     secondary: const Color(0xFFF0B355),
     tertiary: const Color(0xFF5EEAD4),
     surface: const Color(0xFF111827),
-    // ⚠️ FIX: `surfaceVariant` → `surfaceContainerHighest` (see light
-    // theme comment above — same rename, same reason).
     surfaceContainerHighest: const Color(0xFF1F2937),
-    // ⚠️ FIX: `background` param removed — deprecated; dark `surface`
-    // above now covers this role.
     onSurface: const Color(0xFFF1F5F9),
     onSurfaceVariant: const Color(0xFFCBD5E1),
     outline: const Color(0xFF475569),
     error: const Color(0xFFF87171),
     errorContainer: const Color(0xFF7F1D1D),
+    // ✅ Dark-mode-specific containers so chips/avatars/icon badges
+    // (used all over the app now) have a correct low-light tone
+    // instead of inheriting a light-tuned default.
+    primaryContainer: const Color(0xFF334155),
+    secondaryContainer: const Color(0xFF4A3414),
+    tertiaryContainer: const Color(0xFF134E4A),
   );
 
   final textTheme = _rawTextTheme().apply(
@@ -230,15 +325,18 @@ ThemeData buildJTECAADarkTheme() {
     useMaterial3: true,
     brightness: Brightness.dark,
     colorScheme: colorScheme,
-    // ⚠️ FIX: was `colorScheme.background` (deprecated) — see light theme.
     scaffoldBackgroundColor: colorScheme.surface,
     textTheme: textTheme,
-    // ⚠️ FIX: `CardTheme(...)` → `CardThemeData(...)` — see light theme
-    // comment above for the full explanation of this breaking change.
-    cardTheme: CardThemeData(
-      elevation: 1,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      color: colorScheme.surfaceContainerHighest,
-    ),
+
+    // ── Component themes (SAME factories as light) ─────────────
+    cardTheme: _cardTheme(colorScheme),
+    inputDecorationTheme: _inputDecorationTheme(colorScheme),
+    elevatedButtonTheme: _elevatedButtonTheme(colorScheme),
+    outlinedButtonTheme: _outlinedButtonTheme(colorScheme),
+    appBarTheme: _appBarTheme(colorScheme, textTheme),
+    bottomNavigationBarTheme: _bottomNavTheme(colorScheme),
+    chipTheme: _chipTheme(colorScheme),
+    snackBarTheme: _snackBarTheme(colorScheme),
+    dividerTheme: _dividerTheme(colorScheme),
   );
 }

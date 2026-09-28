@@ -20,6 +20,12 @@ class DriveImage extends ConsumerStatefulWidget {
   final Widget? errorWidget;
   final Widget? placeholder;
 
+  /// Optional border radius — set this instead of wrapping the widget in
+  /// a ClipRRect when you want the placeholder & error states to share
+  /// the same rounded shape. Non-breaking: default `null` = no clipping,
+  /// exactly like before.
+  final BorderRadius? borderRadius;
+
   const DriveImage({
     super.key,
     required this.fileId,
@@ -28,6 +34,7 @@ class DriveImage extends ConsumerStatefulWidget {
     this.fit = BoxFit.cover,
     this.errorWidget,
     this.placeholder,
+    this.borderRadius,
   });
 
   @override
@@ -70,25 +77,31 @@ class _DriveImageState extends ConsumerState<DriveImage> {
 
   @override
   Widget build(BuildContext context) {
+    final child = _buildChild(context);
+    final radius = widget.borderRadius;
+
+    // No radius requested → skip the wrapper entirely (zero extra cost).
+    if (radius == null) return child;
+
+    return ClipRRect(
+      borderRadius: radius,
+      child: child,
+    );
+  }
+
+  Widget _buildChild(BuildContext context) {
     if (_failed) {
       return widget.errorWidget ??
-          Container(
+          _DefaultError(
             width: widget.width,
             height: widget.height,
-            color: Theme.of(context).colorScheme.surfaceContainerHighest,
-            child: const Icon(Icons.broken_image_outlined),
           );
     }
     if (_data == null) {
-      final theme = Theme.of(context);
       return widget.placeholder ??
-          Shimmer.fromColors(
-            baseColor: theme.colorScheme.surfaceContainerHighest,
-            highlightColor: theme.colorScheme.surface,
-            child: Container(
-                width: widget.width,
-                height: widget.height,
-                color: Colors.white),
+          _DefaultPlaceholder(
+            width: widget.width,
+            height: widget.height,
           );
     }
     return Image.memory(
@@ -97,6 +110,69 @@ class _DriveImageState extends ConsumerState<DriveImage> {
       height: widget.height,
       fit: widget.fit,
       gaplessPlayback: true, // avoids flicker on rebuild
+      // Prevent decode-time blurring on high-DPI screens; Image.memory
+      // picks the source scale automatically, but this makes the intent
+      // explicit and keeps memory bounded for very large images.
+      filterQuality: FilterQuality.medium,
+      // Graceful degradation if bytes are somehow corrupt.
+      errorBuilder: (_, __, ___) =>
+          widget.errorWidget ??
+          _DefaultError(
+            width: widget.width,
+            height: widget.height,
+          ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// Default placeholder & error — theme-safe in both light and dark mode.
+// ─────────────────────────────────────────────────────────────────────────
+
+class _DefaultPlaceholder extends StatelessWidget {
+  const _DefaultPlaceholder({this.width, this.height});
+
+  final double? width;
+  final double? height;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+
+    return Shimmer.fromColors(
+      baseColor: colorScheme.surfaceContainerHighest,
+      highlightColor: colorScheme.surfaceContainerHigh,
+      child: Container(
+        width: width,
+        height: height,
+        // ✅ Theme-aware — was `Colors.white`, which flashed white in
+        // dark mode before the shimmer layer painted over it.
+        color: colorScheme.surfaceContainerHighest,
+      ),
+    );
+  }
+}
+
+class _DefaultError extends StatelessWidget {
+  const _DefaultError({this.width, this.height});
+
+  final double? width;
+  final double? height;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
+    return Container(
+      width: width,
+      height: height,
+      color: colorScheme.surfaceContainerHighest,
+      alignment: Alignment.center,
+      child: Icon(
+        Icons.broken_image_outlined,
+        color: colorScheme.onSurfaceVariant.withValues(alpha: 0.7),
+      ),
     );
   }
 }

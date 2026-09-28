@@ -4,7 +4,23 @@
 // proxy (Appendix I). Not a Firestore model — Jobs live entirely in
 // Sheets (§5), never in Firestore, so there's no toMap()/toFirestore()
 // here, only fromMap() for parsing the proxy's JSON response.
-
+//
+// ⚠️ BUG FIX (root cause): every field below used to be parsed with a
+// direct `map['x'] as String?` cast. Google Sheets auto-detects a cell's
+// type from what's typed into it — a phone number entered without first
+// setting the column to "Plain Text" format gets silently converted to a
+// NUMBER (and its leading 0 permanently stripped in the process, e.g.
+// "01788091669" -> 1788091669). Apps Script's `getValues()` then returns
+// a JS number for that cell, `JSON.stringify()` emits it unquoted, and
+// `jsonDecode()` on the Dart side produces a plain `int` — so
+// `map['apply_phone'] as String?` threw `type 'int' is not a subtype of
+// type 'String?'` the moment any phone-like field was actually a number
+// rather than a string. This is Architecture's own documented "Leading
+// Zero Fix" (Feature #42, marked as required), which had not actually
+// been applied here yet. Every field is now read through `_asString()`
+// below instead — the exact same `.toString()`-based defensive pattern
+// `news_model.dart` already used safely (which is why News never hit
+// this bug, only Jobs did).
 class JobPostModel {
   final String id;
   final String title;
@@ -57,24 +73,43 @@ class JobPostModel {
 
   factory JobPostModel.fromMap(Map<String, dynamic> map) {
     return JobPostModel(
-      id: map['id'] as String? ?? '',
-      title: map['title'] as String? ?? '',
-      company: map['company'] as String? ?? '',
-      description: map['description'] as String?,
-      deadline: map['deadline'] as String? ?? '',
-      applyLink: map['apply_link'] as String?,
-      applyEmail: map['apply_email'] as String?,
-      applyPhone: map['apply_phone'] as String?,
-      applyWhatsapp: map['apply_whatsapp'] as String?,
-      postedByUid: map['posted_by'] as String? ?? '',
+      id: _asString(map['id']) ?? '',
+      title: _asString(map['title']) ?? '',
+      company: _asString(map['company']) ?? '',
+      description: _asString(map['description']),
+      deadline: _asString(map['deadline']) ?? '',
+      applyLink: _asString(map['apply_link']),
+      applyEmail: _asString(map['apply_email']),
+      // ⚠️ THE ACTUAL FIX for this bug report: these two are the fields
+      // most likely to have been auto-converted to a Sheets Number
+      // (phone-like values). `_asString()` accepts either a String OR a
+      // num from jsonDecode and coerces it — this stops the crash for
+      // ANY row, old or new. It CANNOT restore a leading zero that
+      // Sheets already destroyed on a pre-existing row, though — see the
+      // remediation note in this session's reply for fixing the sheet
+      // itself.
+      applyPhone: _asString(map['apply_phone']),
+      applyWhatsapp: _asString(map['apply_whatsapp']),
+      postedByUid: _asString(map['posted_by']) ?? '',
       // ⚠️ Fallback 'Alumni' matches Appendix L.2.1's JobPostModel default
       // — a row posted before this column existed must still render.
-      postedByName: map['posted_by_name'] as String? ?? 'Alumni',
-      postedByBatch: map['posted_by_batch'] as String? ?? '',
-      postedAt: DateTime.tryParse(map['posted_at'] as String? ?? '') ??
+      postedByName: _asString(map['posted_by_name']) ?? 'Alumni',
+      postedByBatch: _asString(map['posted_by_batch']) ?? '',
+      postedAt: DateTime.tryParse(_asString(map['posted_at']) ?? '') ??
           DateTime.now(),
       autoDeleteDays: int.tryParse('${map['auto_delete_days'] ?? 7}') ?? 7,
     );
+  }
+
+  /// Coerces any JSON-decoded value (String, num, bool) into a String,
+  /// treating null and empty strings alike as "absent" (`null`). This is
+  /// the fix: a direct `as String?` cast throws the instant a Sheets cell
+  /// was auto-typed as a Number; `.toString()` on a `num` always
+  /// succeeds, and on an already-`String` value is a harmless no-op.
+  static String? _asString(dynamic value) {
+    if (value == null) return null;
+    final str = value.toString();
+    return str.isEmpty ? null : str;
   }
 
   /// Request body shape for `action=postJob` (Appendix I.4) — the
@@ -102,6 +137,11 @@ class JobPostModel {
       'deadline': deadline,
       'apply_link': applyLink ?? '',
       'apply_email': applyEmail ?? '',
+      // ⚠️ Sent as plain JSON strings here already (Dart's ?? '' keeps
+      // these String-typed) — the corruption happens Sheets-side when
+      // Apps Script's `appendRow()` writes them into an auto-formatted
+      // column, not on this end. See Code.gs's `postJob()` for the
+      // companion fix that stops Sheets from re-typing these as numbers.
       'apply_phone': applyPhone ?? '',
       'apply_whatsapp': applyWhatsapp ?? '',
       'posted_by': postedByUid,

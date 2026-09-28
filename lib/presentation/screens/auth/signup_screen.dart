@@ -94,6 +94,9 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
   }
 
   Future<void> _submit() async {
+    // Dismiss keyboard before submitting for a smoother transition.
+    FocusScope.of(context).unfocus();
+
     if (!_formKey.currentState!.validate()) {
       return;
     }
@@ -214,145 +217,273 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
   }
 
   void _showError(String message) {
-    ScaffoldMessenger.of(context)
-        .showSnackBar(SnackBar(content: Text(message)));
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
     final isAlumni = _selectedRole == SignupRole.alumni;
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Create Account')),
+      backgroundColor: colorScheme.surface,
+      appBar: AppBar(
+        // ✅ FIXED: explicit title style so "Create Account" is always
+        // readable — no more washed-out/white text on light background.
+        title: Text(
+          'Create Account',
+          style: theme.textTheme.titleLarge?.copyWith(
+            color: colorScheme.onSurface,
+            fontWeight: FontWeight.w700,
+          ),
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+        ),
+        centerTitle: false,
+        backgroundColor: colorScheme.surface,
+        foregroundColor: colorScheme.onSurface,
+        // ✅ Prevents Material 3's surface tint from washing out the text.
+        surfaceTintColor: Colors.transparent,
+        elevation: 0,
+        scrolledUnderElevation: 0.5,
+        iconTheme: IconThemeData(
+          color: colorScheme.onSurface,
+          size: 24,
+        ),
+      ),
       body: SafeArea(
         child: Form(
           key: _formKey,
-          child: ListView(
-            padding: const EdgeInsets.all(24),
-            children: [
-              // §M.2 — Role Tab
-              Center(
-                child: SegmentedButton<SignupRole>(
-                  segments: const [
-                    ButtonSegment(
-                        value: SignupRole.alumni,
-                        label: Text('Alumni'),
-                        icon: Icon(Icons.school)),
-                    ButtonSegment(
-                        value: SignupRole.student,
-                        label: Text('Student'),
-                        icon: Icon(Icons.person)),
-                  ],
-                  selected: {_selectedRole},
-                  onSelectionChanged: (s) =>
-                      setState(() => _selectedRole = s.first),
-                ),
-              ),
-              const SizedBox(height: 24),
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              // Constrain on tablets / desktop for line-length comfort.
+              final maxContentWidth =
+                  constraints.maxWidth > 640 ? 560.0 : constraints.maxWidth;
 
-              // Shared: ID + Batch (Appendix H / §M.3)
-              TextFormField(
-                controller: _idController,
-                decoration: InputDecoration(
-                  labelText: isAlumni ? 'Alumni ID' : 'Student ID',
-                  hintText:
-                      isAlumni ? 'jtec.........alumni' : 'jtec.........student',
-                  prefixIcon: const Icon(Icons.badge_outlined),
-                ),
-                validator: (v) =>
-                    (v == null || v.trim().isEmpty) ? 'ID is required' : null,
-              ),
-              const SizedBox(height: 12),
-              BatchDropdownField(
-                value: _selectedBatch,
-                onChanged: (v) => setState(() => _selectedBatch = v),
-              ),
-              const SizedBox(height: 24),
-
-              // Role-specific name field(s)
-              if (isAlumni) ...[
-                TextFormField(
-                  controller: _firstNameController,
-                  decoration: const InputDecoration(labelText: 'First Name'),
-                  textCapitalization: TextCapitalization.characters,
-                  validator: (v) =>
-                      (v == null || v.trim().isEmpty) ? 'Required' : null,
-                ),
-                const SizedBox(height: 12),
-                TextFormField(
-                  controller: _lastNameController,
-                  decoration: const InputDecoration(labelText: 'Last Name'),
-                  textCapitalization: TextCapitalization.characters,
-                  validator: (v) =>
-                      (v == null || v.trim().isEmpty) ? 'Required' : null,
-                ),
-              ] else
-                TextFormField(
-                  controller: _fullNameController,
-                  decoration: const InputDecoration(labelText: 'Full Name'),
-                  textCapitalization: TextCapitalization.characters,
-                  validator: (v) =>
-                      (v == null || v.trim().isEmpty) ? 'Required' : null,
-                ),
-              const SizedBox(height: 12),
-
-              TextFormField(
-                controller: _emailController,
-                keyboardType: TextInputType.emailAddress,
-                decoration: const InputDecoration(
-                    labelText: 'Email', prefixIcon: Icon(Icons.email_outlined)),
-                validator: (v) {
-                  if (v == null || v.trim().isEmpty) {
-                    return 'Email is required';
-                  }
-                  if (!v.contains('@')) {
-                    return 'Enter a valid email';
-                  }
-                  return null;
-                },
-              ),
-              const SizedBox(height: 12),
-              TextFormField(
-                controller: _passwordController,
-                obscureText: _obscurePassword,
-                decoration: InputDecoration(
-                  labelText: 'Password',
-                  prefixIcon: const Icon(Icons.lock_outline),
-                  suffixIcon: IconButton(
-                    icon: Icon(_obscurePassword
-                        ? Icons.visibility_outlined
-                        : Icons.visibility_off_outlined),
-                    onPressed: () =>
-                        setState(() => _obscurePassword = !_obscurePassword),
+              return Center(
+                child: ListView(
+                  padding: EdgeInsets.symmetric(
+                    horizontal: constraints.maxWidth > 640 ? 32 : 20,
+                    vertical: 20,
                   ),
+                  children: [
+                    ConstrainedBox(
+                      constraints: BoxConstraints(maxWidth: maxContentWidth),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          // §M.2 — Role Tab
+                          _RoleSelector(
+                            selectedRole: _selectedRole,
+                            onChanged: (r) {
+                              if (_isSubmitting) return;
+                              setState(() => _selectedRole = r);
+                            },
+                            colorScheme: colorScheme,
+                            textTheme: theme.textTheme,
+                          ),
+                          const SizedBox(height: 28),
+
+                          // ── Section: Identity ─────────────────────
+                          _SectionHeader(
+                            icon: Icons.badge_outlined,
+                            label: isAlumni
+                                ? 'Alumni Identification'
+                                : 'Student Identification',
+                            textTheme: theme.textTheme,
+                            colorScheme: colorScheme,
+                          ),
+                          const SizedBox(height: 12),
+
+                          // Shared: ID + Batch (Appendix H / §M.3)
+                          TextFormField(
+                            controller: _idController,
+                            textInputAction: TextInputAction.next,
+                            autocorrect: false,
+                            enableSuggestions: false,
+                            decoration: InputDecoration(
+                              labelText: isAlumni ? 'Alumni ID' : 'Student ID',
+                              hintText: isAlumni
+                                  ? 'jtec.........alumni'
+                                  : 'jtec.........student',
+                              prefixIcon: const Icon(Icons.badge_outlined),
+                            ),
+                            validator: (v) => (v == null || v.trim().isEmpty)
+                                ? 'ID is required'
+                                : null,
+                          ),
+                          const SizedBox(height: 12),
+                          BatchDropdownField(
+                            value: _selectedBatch,
+                            onChanged: (v) =>
+                                setState(() => _selectedBatch = v),
+                          ),
+                          const SizedBox(height: 24),
+
+                          // ── Section: Personal Info ────────────────
+                          _SectionHeader(
+                            icon: Icons.person_outline,
+                            label: 'Personal Information',
+                            textTheme: theme.textTheme,
+                            colorScheme: colorScheme,
+                          ),
+                          const SizedBox(height: 12),
+
+                          // Role-specific name field(s)
+                          if (isAlumni) ...[
+                            TextFormField(
+                              controller: _firstNameController,
+                              textInputAction: TextInputAction.next,
+                              textCapitalization: TextCapitalization.characters,
+                              decoration: const InputDecoration(
+                                  labelText: 'First Name'),
+                              validator: (v) => (v == null || v.trim().isEmpty)
+                                  ? 'Required'
+                                  : null,
+                            ),
+                            const SizedBox(height: 12),
+                            TextFormField(
+                              controller: _lastNameController,
+                              textInputAction: TextInputAction.next,
+                              textCapitalization: TextCapitalization.characters,
+                              decoration:
+                                  const InputDecoration(labelText: 'Last Name'),
+                              validator: (v) => (v == null || v.trim().isEmpty)
+                                  ? 'Required'
+                                  : null,
+                            ),
+                          ] else
+                            TextFormField(
+                              controller: _fullNameController,
+                              textInputAction: TextInputAction.next,
+                              textCapitalization: TextCapitalization.characters,
+                              decoration:
+                                  const InputDecoration(labelText: 'Full Name'),
+                              validator: (v) => (v == null || v.trim().isEmpty)
+                                  ? 'Required'
+                                  : null,
+                            ),
+                          const SizedBox(height: 12),
+
+                          TextFormField(
+                            controller: _emailController,
+                            keyboardType: TextInputType.emailAddress,
+                            textInputAction: TextInputAction.next,
+                            autocorrect: false,
+                            enableSuggestions: false,
+                            autofillHints: const [AutofillHints.email],
+                            decoration: const InputDecoration(
+                              labelText: 'Email',
+                              hintText: 'you@example.com',
+                              prefixIcon: Icon(Icons.email_outlined),
+                            ),
+                            validator: (v) {
+                              if (v == null || v.trim().isEmpty) {
+                                return 'Email is required';
+                              }
+                              if (!v.contains('@')) {
+                                return 'Enter a valid email';
+                              }
+                              return null;
+                            },
+                          ),
+                          const SizedBox(height: 12),
+                          TextFormField(
+                            controller: _passwordController,
+                            obscureText: _obscurePassword,
+                            textInputAction: TextInputAction.next,
+                            autofillHints: const [AutofillHints.newPassword],
+                            decoration: InputDecoration(
+                              labelText: 'Password',
+                              hintText: 'At least 6 characters',
+                              prefixIcon: const Icon(Icons.lock_outline),
+                              suffixIcon: IconButton(
+                                tooltip: _obscurePassword
+                                    ? 'Show password'
+                                    : 'Hide password',
+                                icon: Icon(_obscurePassword
+                                    ? Icons.visibility_outlined
+                                    : Icons.visibility_off_outlined),
+                                onPressed: () => setState(
+                                    () => _obscurePassword = !_obscurePassword),
+                              ),
+                            ),
+                            validator: (v) => (v == null || v.length < 6)
+                                ? 'At least 6 characters'
+                                : null,
+                          ),
+                          const SizedBox(height: 24),
+
+                          // ── Section: Role-specific details ────────
+                          _SectionHeader(
+                            icon: isAlumni
+                                ? Icons.work_outline
+                                : Icons.school_outlined,
+                            label: isAlumni
+                                ? 'Professional Details'
+                                : 'Additional Details',
+                            textTheme: theme.textTheme,
+                            colorScheme: colorScheme,
+                          ),
+                          const SizedBox(height: 12),
+
+                          if (isAlumni)
+                            ..._buildAlumniOnlyFields()
+                          else
+                            ..._buildStudentOnlyFields(),
+
+                          const SizedBox(height: 32),
+                          ElevatedButton(
+                            onPressed: _isSubmitting ? null : _submit,
+                            style: ElevatedButton.styleFrom(
+                              minimumSize: const Size.fromHeight(56),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(14),
+                              ),
+                            ),
+                            child: _isSubmitting
+                                ? SizedBox(
+                                    height: 22,
+                                    width: 22,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2.4,
+                                      color: colorScheme.onPrimary,
+                                    ),
+                                  )
+                                : Text(
+                                    'CREATE ACCOUNT',
+                                    style: theme.textTheme.labelLarge?.copyWith(
+                                      color: colorScheme.onPrimary,
+                                      fontWeight: FontWeight.w700,
+                                      letterSpacing: 0.6,
+                                    ),
+                                  ),
+                          ),
+                          const SizedBox(height: 12),
+                          Text(
+                            'By creating an account, you agree to our Terms '
+                            '& Privacy Policy.',
+                            textAlign: TextAlign.center,
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: colorScheme.onSurfaceVariant,
+                            ),
+                            maxLines: 3,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          const SizedBox(height: 24),
+                        ],
+                      ),
+                    ),
+                  ],
                 ),
-                validator: (v) => (v == null || v.length < 6)
-                    ? 'At least 6 characters'
-                    : null,
-              ),
-              const SizedBox(height: 24),
-
-              if (isAlumni)
-                ..._buildAlumniOnlyFields()
-              else
-                ..._buildStudentOnlyFields(),
-
-              const SizedBox(height: 32),
-              ElevatedButton(
-                onPressed: _isSubmitting ? null : _submit,
-                style: ElevatedButton.styleFrom(
-                    minimumSize: const Size(double.infinity, 56)),
-                child: _isSubmitting
-                    ? const SizedBox(
-                        height: 20,
-                        width: 20,
-                        child: CircularProgressIndicator(
-                            strokeWidth: 2, color: Colors.white),
-                      )
-                    : const Text('CREATE ACCOUNT'),
-              ),
-              const SizedBox(height: 24),
-            ],
+              );
+            },
           ),
         ),
       ),
@@ -370,8 +501,11 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
         items: Departments.all
             .map((d) => DropdownMenuItem(
                   value: d,
-                  child: Text(Departments.getShortLabel(d),
-                      maxLines: 1, overflow: TextOverflow.ellipsis),
+                  child: Text(
+                    Departments.getShortLabel(d),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
                 ))
             .toList(),
         onChanged: (v) => setState(() => _department = v),
@@ -386,20 +520,25 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
       // ⚠️ Appendix L.1.2 — free-text, not a district-style dropdown.
       TextFormField(
         controller: _alumniLocationController,
+        textInputAction: TextInputAction.next,
         decoration: const InputDecoration(
           labelText: 'Current Location',
-          hintText: 'e.g. Sher e bangla hall ,JTEC',
+          hintText: 'e.g. Sher e Bangla Hall, JTEC',
         ),
         textCapitalization: TextCapitalization.words,
         maxLength: 80,
         validator: (v) => (v == null || v.trim().isEmpty) ? 'Required' : null,
       ),
+      const SizedBox(height: 4),
       DropdownButtonFormField<String>(
         isExpanded: true,
         initialValue: _districtAlumni,
         decoration: const InputDecoration(labelText: 'District'),
         items: Districts.all
-            .map((d) => DropdownMenuItem(value: d, child: Text(d)))
+            .map((d) => DropdownMenuItem(
+                  value: d,
+                  child: Text(d, maxLines: 1, overflow: TextOverflow.ellipsis),
+                ))
             .toList(),
         onChanged: (v) => setState(() => _districtAlumni = v),
         validator: (v) => v == null ? 'Required' : null,
@@ -408,8 +547,13 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
       TextFormField(
         controller: _alumniPhoneController,
         keyboardType: TextInputType.phone,
+        textInputAction: TextInputAction.next,
+        autofillHints: const [AutofillHints.telephoneNumber],
         decoration: const InputDecoration(
-            labelText: 'Contact Number', hintText: '0171XXXXXXX'),
+          labelText: 'Contact Number',
+          hintText: '0171XXXXXXX',
+          prefixIcon: Icon(Icons.phone_outlined),
+        ),
         validator: PhoneValidator.getErrorMessage,
       ),
       const SizedBox(height: 12),
@@ -429,8 +573,13 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
       TextFormField(
         controller: _studentPhoneController,
         keyboardType: TextInputType.phone,
+        textInputAction: TextInputAction.next,
+        autofillHints: const [AutofillHints.telephoneNumber],
         decoration: const InputDecoration(
-            labelText: 'Contact Number', hintText: '0171XXXXXXX'),
+          labelText: 'Contact Number',
+          hintText: '0171XXXXXXX',
+          prefixIcon: Icon(Icons.phone_outlined),
+        ),
         validator: PhoneValidator.getErrorMessage,
       ),
       const SizedBox(height: 12),
@@ -448,20 +597,135 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
         initialValue: _districtStudent,
         decoration: const InputDecoration(labelText: 'District (optional)'),
         items: Districts.all
-            .map((d) => DropdownMenuItem(value: d, child: Text(d)))
+            .map((d) => DropdownMenuItem(
+                  value: d,
+                  child: Text(d, maxLines: 1, overflow: TextOverflow.ellipsis),
+                ))
             .toList(),
         onChanged: (v) => setState(() => _districtStudent = v),
       ),
       const SizedBox(height: 12),
       TextFormField(
         controller: _studentLocationController,
+        textInputAction: TextInputAction.next,
         decoration: const InputDecoration(
           labelText: 'Current Location (optional)',
-          hintText: 'e.g. Sher e bangla hall ,JTEC',
+          hintText: 'e.g. Sher e Bangla Hall, JTEC',
         ),
         textCapitalization: TextCapitalization.words,
         maxLength: 80,
       ),
     ];
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// Small presentational helpers (no business logic).
+// ─────────────────────────────────────────────────────────────────────────
+
+/// Role selector with a soft container + SegmentedButton, so it
+/// visually anchors the top of the form and stays legible in both themes.
+class _RoleSelector extends StatelessWidget {
+  const _RoleSelector({
+    required this.selectedRole,
+    required this.onChanged,
+    required this.colorScheme,
+    required this.textTheme,
+  });
+
+  final SignupRole selectedRole;
+  final ValueChanged<SignupRole> onChanged;
+  final ColorScheme colorScheme;
+  final TextTheme textTheme;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(6),
+      decoration: BoxDecoration(
+        color: colorScheme.surfaceContainerHighest.withOpacity(0.4),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: colorScheme.outlineVariant),
+      ),
+      child: SizedBox(
+        width: double.infinity,
+        child: SegmentedButton<SignupRole>(
+          segments: const [
+            ButtonSegment(
+              value: SignupRole.alumni,
+              label: Text('Alumni'),
+              icon: Icon(Icons.school),
+            ),
+            ButtonSegment(
+              value: SignupRole.student,
+              label: Text('Student'),
+              icon: Icon(Icons.person),
+            ),
+          ],
+          selected: {selectedRole},
+          onSelectionChanged: (s) => onChanged(s.first),
+          showSelectedIcon: false,
+          style: ButtonStyle(
+            // Overflow-proof labels even at 200% font scale.
+            textStyle: WidgetStatePropertyAll(
+              textTheme.labelLarge?.copyWith(fontWeight: FontWeight.w600),
+            ),
+            foregroundColor: WidgetStateProperty.resolveWith((states) {
+              if (states.contains(WidgetState.selected)) {
+                return colorScheme.onPrimary;
+              }
+              return colorScheme.onSurfaceVariant;
+            }),
+            backgroundColor: WidgetStateProperty.resolveWith((states) {
+              if (states.contains(WidgetState.selected)) {
+                return colorScheme.primary;
+              }
+              return Colors.transparent;
+            }),
+            side: WidgetStatePropertyAll(
+              BorderSide(color: colorScheme.outlineVariant),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Compact section header — icon + label — visually separates the form
+/// into logical groups without extra chrome.
+class _SectionHeader extends StatelessWidget {
+  const _SectionHeader({
+    required this.icon,
+    required this.label,
+    required this.textTheme,
+    required this.colorScheme,
+  });
+
+  final IconData icon;
+  final String label;
+  final TextTheme textTheme;
+  final ColorScheme colorScheme;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Icon(icon, size: 18, color: colorScheme.primary),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Text(
+            label,
+            style: textTheme.titleSmall?.copyWith(
+              color: colorScheme.primary,
+              fontWeight: FontWeight.w700,
+              letterSpacing: 0.3,
+            ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ),
+      ],
+    );
   }
 }
