@@ -7,35 +7,42 @@
 // for this shell — My Profile is reached via an AppBar action instead.
 // ⚠️ UPDATED: a Student-only Drawer (My Profile + Logout) was added at the
 // user's explicit request, deviating from that §M.6 line.
-// ⚠️ UPDATED (this revision): the AppBar "My Profile" action was REMOVED
-// — My Profile is now reached only via the drawer, so the icon was
-// redundant clutter in the top bar.
+// ⚠️ UPDATED: the AppBar "My Profile" action was REMOVED — My Profile is
+// now reached only via the drawer.
 //
 // ⚠️ PHASE-ORDERING NOTE (per the Master Prompt's own instruction for
 // Phase 3B): "wire the News-tab reuse only once Phase 8 exists." Both
-// Phase 5 (DirectoryScreen) and Phase 8 (NewsScreen) now exist, so both
-// tabs below are the real, wired-in screens — no placeholder remains in
-// this shell.
+// Phase 5 (DirectoryScreen) and Phase 8 (NewsScreen) now exist.
+//
+// ⚠️ NOTIFICATIONS (this revision): a bell icon with unread-count badge
+// was added to the AppBar. Students only ever receive "news"-type
+// notifications (their FCM topic subscription excludes jobs/all, §M.9),
+// so the notification history Hive box naturally contains only news —
+// no client-side filtering needed. The icon routes to the same
+// NotificationsScreen the Alumni shell uses.
 //
 // ⚠️ UI POLISH: modern Material 3 AppBar + NavigationBar with subtle
 // outline borders, theme-tuned indicator/label colors, and rounded
 // icons. Matches the visual language of the Login / Signup / Jobs /
-// News screens. Zero behaviour change.
+// News screens. Zero behaviour change beyond the new bell action.
 
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../providers/notification_provider.dart';
 import '../../widgets/common/student_drawer.dart';
 import '../directory/directory_screen.dart';
 import '../news/news_screen.dart';
+import '../notifications/notifications_screen.dart';
 
-class StudentShell extends StatefulWidget {
+class StudentShell extends ConsumerStatefulWidget {
   const StudentShell({super.key});
 
   @override
-  State<StudentShell> createState() => _StudentShellState();
+  ConsumerState<StudentShell> createState() => _StudentShellState();
 }
 
-class _StudentShellState extends State<StudentShell> {
+class _StudentShellState extends ConsumerState<StudentShell> {
   int _currentIndex = 0;
 
   static const List<Widget> _tabs = [
@@ -78,9 +85,76 @@ class _StudentShellState extends State<StudentShell> {
         elevation: 0,
         scrolledUnderElevation: 0.5,
         iconTheme: IconThemeData(color: colorScheme.onSurface, size: 24),
-        // ⚠️ AppBar "My Profile" action removed — My Profile lives in the
-        // drawer now, so a second entry point in the top bar was visual
-        // noise. The drawer is the single source for profile access.
+        actions: [
+          // ✅ Bell icon with unread badge — routes to the shared
+          // NotificationsScreen. Student's history is naturally
+          // news-only because FCM topics exclude jobs/all for this role.
+          Consumer(
+            builder: (context, ref, _) {
+              final unreadAsync = ref.watch(unreadNotificationCountProvider);
+              final unreadCount = unreadAsync.maybeWhen(
+                data: (count) => count,
+                orElse: () => 0,
+              );
+
+              return Padding(
+                padding: const EdgeInsets.only(right: 8),
+                child: IconButton(
+                  tooltip: 'Notifications',
+                  onPressed: () => Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => const NotificationsScreen(),
+                    ),
+                  ),
+                  icon: Stack(
+                    clipBehavior: Clip.none,
+                    children: [
+                      Icon(
+                        Icons.notifications_none_rounded,
+                        color: colorScheme.onSurface,
+                        size: 24,
+                      ),
+                      if (unreadCount > 0)
+                        Positioned(
+                          top: -4,
+                          right: -4,
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 5,
+                              vertical: 1,
+                            ),
+                            constraints: const BoxConstraints(
+                              minWidth: 18,
+                              minHeight: 18,
+                            ),
+                            decoration: BoxDecoration(
+                              color: colorScheme.error,
+                              borderRadius: BorderRadius.circular(9),
+                              border: Border.all(
+                                color: colorScheme.surface,
+                                width: 1.5,
+                              ),
+                            ),
+                            alignment: Alignment.center,
+                            child: Text(
+                              unreadCount > 99 ? '99+' : '$unreadCount',
+                              style: TextStyle(
+                                color: colorScheme.onError,
+                                fontSize: 10,
+                                fontWeight: FontWeight.w800,
+                                height: 1.0,
+                              ),
+                              textAlign: TextAlign.center,
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+              );
+            },
+          ),
+        ],
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(1),
           child: Container(

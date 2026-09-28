@@ -3,22 +3,28 @@
 // Architecture §7.3 (Alumni Directory) + Appendix F.7.4 (screen wireframe)
 // + L.1.3/L.1.4 (search/filter upgrade).
 //
-// ⚠️ PREMIUM FILTER SHEET (this revision):
-//   Restructured the filter sheet for a cleaner, more premium look:
-//     • Grouped fields under section headers ("Basic Filters",
-//       "Job Information") — makes the 6 dropdowns scannable.
-//     • Filled-style dropdowns (surfaceContainerHighest) with no
-//       outline — reads as tap-able rows rather than form inputs.
-//     • Extra vertical rhythm (16dp between fields, 24dp between
-//       sections) so nothing feels cramped.
-//     • Active filter highlight — a coloured left border + tinted
-//       background on any dropdown whose value is non-null, so a
-//       user can see at a glance which filters are set.
-//     • Footer buttons promoted to 48dp tall with a filled Apply
-//       and tonal Clear All — matches Material 3 button guidelines
-//       and clears the home indicator via SafeArea bottom.
-//     • Sheet height raised to 0.85 so more of the list is visible
-//       before scrolling; the field list itself scrolls.
+// ⚠️ PREMIUM FILTER SHEET: restructured the filter sheet for a cleaner,
+// more premium look.
+//
+// ⚠️ PENDING-FILTER LISTENER (this revision): the Home Dashboard's
+// Donut Chart stashes a career-status value in
+// `pendingDirectoryFilterProvider` before switching to this tab
+// (Appendix F.6.O). The Directory provider body itself also drains that
+// value inside a `Future.microtask` — but that only fires the FIRST
+// time the provider is constructed. Since HomeScreen uses an
+// `IndexedStack` (all three tabs are built eagerly), the provider is
+// almost always already alive by the time the user taps a donut row —
+// so the microtask has already run and missed the value.
+//
+// Fix: also listen for changes to `pendingDirectoryFilterProvider` in
+// this widget. Whenever a non-null value arrives, apply it as a
+// server-side career-status filter and clear the slot. This works
+// regardless of whether the notifier is fresh or long-lived, and
+// preserves the one-shot semantics (the value is nulled immediately).
+//
+// Logic is otherwise identical to the previous revision — same search
+// bar, same filter sheet, same list, same taps. Only the listener above
+// the existing `ref.watch(directoryNotifierProvider)` is new.
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -28,6 +34,7 @@ import '../../../core/utils/company_types.dart';
 import '../../../core/utils/departments_helper.dart';
 import '../../../core/utils/districts.dart';
 import '../../../core/utils/job_departments.dart';
+import '../../providers/dashboard_provider.dart';
 import '../../providers/directory_provider.dart';
 import '../../widgets/common/alumni_directory_card.dart';
 import '../../widgets/common/batch_dropdown_field.dart';
@@ -65,6 +72,20 @@ class _DirectoryScreenState extends ConsumerState<DirectoryScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // ✅ NEW: watch for a pending career-status filter stashed by the
+    // Home Dashboard's Donut Chart. Fires even if the directory
+    // provider is already constructed, which the provider's own
+    // microtask drain would otherwise miss under IndexedStack.
+    ref.listen<String?>(pendingDirectoryFilterProvider, (prev, next) {
+      if (next == null) return;
+      // Apply as a server-side filter, then clear the slot so it
+      // doesn't re-apply on the next rebuild.
+      ref
+          .read(directoryNotifierProvider.notifier)
+          .applyServerFilters(careerStatus: next);
+      ref.read(pendingDirectoryFilterProvider.notifier).state = null;
+    });
+
     final state = ref.watch(directoryNotifierProvider);
     final theme = Theme.of(context);
 
@@ -304,7 +325,7 @@ class _DirectoryScreenState extends ConsumerState<DirectoryScreen> {
 }
 
 // ─────────────────────────────────────────────────────────────────────
-// FILTER SHEET — premium redesign
+// FILTER SHEET — premium redesign (unchanged)
 // ─────────────────────────────────────────────────────────────────────
 class _FilterSheet extends ConsumerStatefulWidget {
   final DirectoryState initialState;
@@ -350,7 +371,6 @@ class _FilterSheetState extends ConsumerState<_FilterSheet> {
 
     return Column(
       children: [
-        // ── Grab handle ─────────────────────────────────────────
         Padding(
           padding: const EdgeInsets.only(top: 12, bottom: 8),
           child: Center(
@@ -364,8 +384,6 @@ class _FilterSheetState extends ConsumerState<_FilterSheet> {
             ),
           ),
         ),
-
-        // ── Title row ───────────────────────────────────────────
         Padding(
           padding: const EdgeInsets.fromLTRB(20, 4, 20, 16),
           child: Row(
@@ -414,23 +432,17 @@ class _FilterSheetState extends ConsumerState<_FilterSheet> {
             ],
           ),
         ),
-
-        // Divider under the header
         Divider(
           height: 1,
           thickness: 1,
           color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5),
         ),
-
-        // ── Scrollable fields ───────────────────────────────────
         Expanded(
           child: ListView(
             padding: const EdgeInsets.fromLTRB(20, 20, 20, 20),
             children: [
-              // Section: Basic Filters
               _SectionHeader(label: 'Basic Filters', theme: theme),
               const SizedBox(height: 12),
-
               _PremiumDropdown<String>(
                 label: 'Department',
                 icon: Icons.school_outlined,
@@ -449,14 +461,12 @@ class _FilterSheetState extends ConsumerState<_FilterSheet> {
                 onChanged: (v) => setState(() => _department = v),
               ),
               const SizedBox(height: 16),
-
               BatchDropdownField(
                 value: _batch,
                 onChanged: (v) => setState(() => _batch = v),
                 validator: (_) => null,
               ),
               const SizedBox(height: 16),
-
               _PremiumDropdown<String>(
                 label: 'District',
                 icon: Icons.location_on_outlined,
@@ -474,11 +484,9 @@ class _FilterSheetState extends ConsumerState<_FilterSheet> {
                     .toList(),
                 onChanged: (v) => setState(() => _district = v),
               ),
-
               const SizedBox(height: 24),
               _SectionHeader(label: 'Job Information', theme: theme),
               const SizedBox(height: 12),
-
               _PremiumDropdown<String>(
                 label: 'Company Type',
                 icon: Icons.business_outlined,
@@ -497,7 +505,6 @@ class _FilterSheetState extends ConsumerState<_FilterSheet> {
                 onChanged: (v) => setState(() => _companyType = v),
               ),
               const SizedBox(height: 16),
-
               _PremiumDropdown<String>(
                 label: 'Job Department',
                 icon: Icons.work_outline,
@@ -516,7 +523,6 @@ class _FilterSheetState extends ConsumerState<_FilterSheet> {
                 onChanged: (v) => setState(() => _jobDepartment = v),
               ),
               const SizedBox(height: 16),
-
               _PremiumDropdown<String>(
                 label: 'Career Status',
                 icon: Icons.trending_up_outlined,
@@ -537,8 +543,6 @@ class _FilterSheetState extends ConsumerState<_FilterSheet> {
             ],
           ),
         ),
-
-        // ── Sticky footer ───────────────────────────────────────
         Container(
           decoration: BoxDecoration(
             color: theme.colorScheme.surface,
@@ -643,9 +647,6 @@ class _FilterSheetState extends ConsumerState<_FilterSheet> {
   }
 }
 
-// ─────────────────────────────────────────────────────────────────────
-// Section header (small caps label + divider line)
-// ─────────────────────────────────────────────────────────────────────
 class _SectionHeader extends StatelessWidget {
   final String label;
   final ThemeData theme;
@@ -677,9 +678,6 @@ class _SectionHeader extends StatelessWidget {
   }
 }
 
-// ─────────────────────────────────────────────────────────────────────
-// Premium filled dropdown — reads as a tappable row, not a form input
-// ─────────────────────────────────────────────────────────────────────
 class _PremiumDropdown<T> extends StatelessWidget {
   final String label;
   final IconData icon;
@@ -703,8 +701,6 @@ class _PremiumDropdown<T> extends StatelessWidget {
     final isDark = theme.brightness == Brightness.dark;
     final hasValue = value != null;
 
-    // Tinted background when a value is set — the user can see at a
-    // glance which filters are active.
     final bgColor = hasValue
         ? theme.colorScheme.primaryContainer
             .withValues(alpha: isDark ? 0.55 : 0.65)
@@ -719,7 +715,6 @@ class _PremiumDropdown<T> extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
       children: [
-        // Field label
         Padding(
           padding: const EdgeInsets.only(left: 4, bottom: 6),
           child: Text(
@@ -733,8 +728,6 @@ class _PremiumDropdown<T> extends StatelessWidget {
             overflow: TextOverflow.ellipsis,
           ),
         ),
-
-        // Filled dropdown row
         Container(
           decoration: BoxDecoration(
             color: bgColor,

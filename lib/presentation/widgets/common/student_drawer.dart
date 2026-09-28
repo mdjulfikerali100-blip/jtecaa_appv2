@@ -5,8 +5,7 @@
 /// ⚠️ DEVIATION FROM ARCHITECTURE (explicit user request): §M.6 says the
 /// Student shell has "no side Drawer" and reaches My Profile via an
 /// AppBar action. A Drawer with Logout was requested afterwards, so this
-/// adds one. The AppBar "My Profile" icon in student_shell.dart is left
-/// in place — this drawer is an addition, not a replacement.
+/// adds one.
 ///
 /// ⚠️ Deliberately NOT a reuse of the Alumni `SideDrawer`:
 ///   - SideDrawer reads the profile via `profileViewProvider`, which
@@ -21,25 +20,23 @@
 /// So this drawer reads only the Firebase Auth user (email), which
 /// exists for every role, and never touches Firestore or Sheets.
 ///
-/// ⚠️ UI POLISH (this revision):
-///   - Modern gradient header with rounded bottom corners + soft avatar
-///     shadow; matches the Alumni drawer's header rhythm.
-///   - Menu tiles get icon bubbles + trailing chevrons (from the same
-///     design language as the Alumni SideDrawer).
-///   - Section labels restyled with a leading accent bar + soft divider.
-///   - SwitchListTiles restyled with color-tinted icon chips + tighter
-///     copy; subtitles bounded for 200% font scale.
-///   - Logout restyled as an outlined destructive tile (icon bubble +
-///     label) — matches the Alumni SideDrawer.
-///   - Info dialog picks up the theme's rounded shape + onSurface text.
-///   - Every Text has bounded maxLines + ellipsis (safe on narrow
-///     devices AND at 200% system font scale).
+/// ⚠️ NOTIFICATIONS (this revision): a "Notifications" tile was added to
+/// the Account section, next to "My Profile", routing to the shared
+/// NotificationsScreen. A Student's history is naturally news-only
+/// because their FCM topic subscription excludes jobs/all (§M.9).
+///
+/// ⚠️ UI POLISH: modern gradient header with rounded bottom corners,
+/// icon bubbles + chevrons on menu tiles, an accent bar on section
+/// labels, tinted switch tiles, and an outlined destructive Logout
+/// tile. Every Text has bounded maxLines + ellipsis — safe at 200%
+/// font scale and on narrow devices.
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../providers/auth_provider.dart';
 import '../../providers/settings_provider.dart';
+import '../../screens/notifications/notifications_screen.dart';
 import '../../screens/student/my_profile_screen.dart';
 import 'logout_helper.dart';
 
@@ -58,8 +55,7 @@ class StudentDrawer extends ConsumerWidget {
     final isDark = theme.brightness == Brightness.dark;
 
     // valueOrNull, never `.value` — `.value` rethrows the stored error on
-    // an AsyncError in this Riverpod version (the same mistake behind the
-    // earlier SideDrawer crash).
+    // an AsyncError in this Riverpod version.
     final email = ref.watch(authStateProvider).valueOrNull?.email ?? '';
 
     // Same providers the Alumni Settings screen uses, so both shells
@@ -94,12 +90,28 @@ class StudentDrawer extends ConsumerWidget {
                   color: _kHeaderNavy,
                   theme: theme,
                   onTap: () {
-                    // pop() then an immediate push() with NO await between
-                    // them is safe — the context can't unmount in between.
                     Navigator.pop(context);
                     Navigator.of(context).push(
                       MaterialPageRoute(
                         builder: (_) => const MyProfileScreen(),
+                      ),
+                    );
+                  },
+                ),
+                const SizedBox(height: 4),
+                // ✅ Notifications — routes to shared NotificationsScreen.
+                // Student history is naturally news-only (FCM topics
+                // exclude jobs/all for this role, §M.9).
+                _DrawerMenuTile(
+                  icon: Icons.notifications_outlined,
+                  label: 'Notifications',
+                  color: const Color(0xFF0F766E),
+                  theme: theme,
+                  onTap: () {
+                    Navigator.pop(context);
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => const NotificationsScreen(),
                       ),
                     );
                   },
@@ -110,11 +122,6 @@ class StudentDrawer extends ConsumerWidget {
                 // ── Preferences ───────────────────────────────
                 _DrawerSectionLabel(label: 'Preferences', theme: theme),
                 const SizedBox(height: 6),
-
-                // Push toggle: OFF unsubscribes from every topic; ON
-                // re-subscribes by role, so a Student is put back on
-                // "news" ONLY, never "jobs"/"all" (§M.9) — the notifier
-                // reads the role itself, nothing to pass here.
                 _DrawerSwitchTile(
                   icon: Icons.notifications_outlined,
                   iconColor: const Color(0xFF0F766E),
@@ -126,11 +133,6 @@ class StudentDrawer extends ConsumerWidget {
                   theme: theme,
                 ),
                 const SizedBox(height: 8),
-
-                // ⚠️ This is "force dark", not a Light/Dark pair: ON = dark,
-                // OFF = follow the device's own setting (the two-state
-                // switch Appendix F.7.9 specifies). Spelled out in the
-                // subtitle so OFF isn't mistaken for "force light".
                 _DrawerSwitchTile(
                   icon: Icons.dark_mode_outlined,
                   iconColor: const Color(0xFFB45309),
@@ -203,13 +205,6 @@ class StudentDrawer extends ConsumerWidget {
                 _LogoutTile(
                   theme: theme,
                   isDark: isDark,
-                  // ⚠️ Do NOT pop the drawer first. confirmAndSignOut()
-                  // awaits a dialog and then signOut(); popping first
-                  // lets the drawer's close animation unmount this
-                  // context mid-flow, and its `context.mounted` guard
-                  // then silently skips the final navigation (sign-out
-                  // happens, nothing visible follows). Same bug already
-                  // fixed in the Alumni SideDrawer.
                   onTap: () => confirmAndSignOut(context, ref),
                 ),
               ],
@@ -220,9 +215,6 @@ class StudentDrawer extends ConsumerWidget {
     );
   }
 
-  // Same placeholder dialog + wording as SettingsScreen (Alumni). The real
-  // policy/terms text is due in Phase 13, so until then the text lives in
-  // BOTH places — update both when it is finalized.
   void _showInfoDialog(BuildContext context, String title, String body) {
     showDialog(
       context: context,
@@ -394,7 +386,7 @@ class _StudentDrawerHeader extends StatelessWidget {
 }
 
 // ─────────────────────────────────────────────────────────────────────
-// SECTION LABEL — accent bar + label
+// SECTION LABEL
 // ─────────────────────────────────────────────────────────────────────
 class _DrawerSectionLabel extends StatelessWidget {
   final String label;
@@ -440,7 +432,7 @@ class _DrawerSectionLabel extends StatelessWidget {
 }
 
 // ─────────────────────────────────────────────────────────────────────
-// MENU TILE — icon bubble + label + chevron
+// MENU TILE
 // ─────────────────────────────────────────────────────────────────────
 class _DrawerMenuTile extends StatelessWidget {
   final IconData icon;
@@ -520,7 +512,7 @@ class _DrawerMenuTile extends StatelessWidget {
 }
 
 // ─────────────────────────────────────────────────────────────────────
-// SWITCH TILE — tinted icon chip + title + optional subtitle + switch
+// SWITCH TILE
 // ─────────────────────────────────────────────────────────────────────
 class _DrawerSwitchTile extends StatelessWidget {
   final IconData icon;
@@ -623,7 +615,7 @@ class _DrawerSwitchTile extends StatelessWidget {
 }
 
 // ─────────────────────────────────────────────────────────────────────
-// LOGOUT TILE — destructive, outlined
+// LOGOUT TILE
 // ─────────────────────────────────────────────────────────────────────
 class _LogoutTile extends StatelessWidget {
   final ThemeData theme;

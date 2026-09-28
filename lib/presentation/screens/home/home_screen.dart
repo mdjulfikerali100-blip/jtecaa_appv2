@@ -3,19 +3,19 @@
 // Architecture Appendix F.6.I (Bottom Navigation) + F.7.3 (Home Dashboard)
 // + §8.3 (Stats Overview + Donut Chart).
 //
-// ⚠️ CLEANER APPBAR (this revision):
-//   The previous appbar stacked three circular buttons (menu, brand-logo,
-//   bell) + a two-line title — visually crowded, especially on narrow
-//   phones. Now:
-//     • The redundant brand-logo circle is gone; "JTECAA" alone carries
-//       the brand mark (its letterspacing + weight do the job).
-//     • Title uses a two-weight lockup: "JTECAA" bold, the greeting
-//       line sits beneath it in a lighter weight, so the eye reads the
-//       brand first and the name second.
-//     • Menu + bell sit in a single shared visual "chip" language —
-//       same 40dp circular hit-target, same translucent white — but
-//       now with symmetric left/right margin so nothing looks pushed
-//       into a corner.
+// ⚠️ CLEANER APPBAR: two-weight lockup, single chip language for
+// menu/bell, symmetric margins.
+//
+// ⚠️ STATS OVERVIEW: reduced 3 stat cards to 2. "Total Alumni" was
+// redundant with the Career Overview donut's center total (same
+// number, same screen). Two cards means each is comfortably wide on
+// every device — no ellipsis, no cramped labels, no 2+1 wrap.
+//
+// ⚠️ FIX (this revision): `Row` in `_buildStatsSection` was using
+// `crossAxisAlignment: CrossAxisAlignment.stretch`, which forwards
+// the parent sliver's unbounded height down to each card →
+// "BoxConstraints forces an infinite height" red screen. Changed to
+// `.start`, so each card sizes itself from its own Column content.
 
 import 'dart:async';
 import 'dart:math' as math;
@@ -173,8 +173,6 @@ class _DashboardTabState extends ConsumerState<_DashboardTab> {
   bool _userInteracting = false;
   bool _autoScrollStarted = false;
 
-  // ⚠️ INCREASED SCROLL SPEED: was 22 dp/s — too slow. 45 dp/s keeps
-  // the motion clearly perceptible without ever feeling frantic.
   static const _autoScrollSpeedDps = 45.0; // dp per second
   static const _resumeDelay = Duration(seconds: 3);
 
@@ -243,7 +241,6 @@ class _DashboardTabState extends ConsumerState<_DashboardTab> {
       },
       child: CustomScrollView(
         slivers: [
-          // ── Cleaner AppBar ──────────────────────────────────
           SliverAppBar(
             floating: true,
             snap: true,
@@ -303,7 +300,6 @@ class _DashboardTabState extends ConsumerState<_DashboardTab> {
     );
   }
 
-  // ── Cleaner AppBar title — no brand-logo circle, tighter lockup ────
   Widget _buildAppBarTitle(
       BuildContext context, WidgetRef ref, ThemeData theme) {
     final profileAsync = ref.watch(myAlumniProfileProvider);
@@ -318,7 +314,6 @@ class _DashboardTabState extends ConsumerState<_DashboardTab> {
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,
         children: [
-          // Brand — the only bold element
           Text(
             'JTECAA',
             style: theme.textTheme.titleLarge?.copyWith(
@@ -332,7 +327,6 @@ class _DashboardTabState extends ConsumerState<_DashboardTab> {
           ),
           if (firstName != null && firstName.isNotEmpty) ...[
             const SizedBox(height: 2),
-            // Greeting — lighter weight so it reads as secondary
             Text(
               'Hi, $firstName',
               style: theme.textTheme.bodySmall?.copyWith(
@@ -524,65 +518,38 @@ class _DashboardTabState extends ConsumerState<_DashboardTab> {
       padding: const EdgeInsets.fromLTRB(16, 20, 16, 0),
       child: Column(
         children: [
-          LayoutBuilder(
-            builder: (context, constraints) {
-              final ts = MediaQuery.of(context).textScaler.scale(1.0);
-              final perCard = (108.0 * ts).clamp(108.0, 156.0);
-              final fits = constraints.maxWidth >= (perCard * 3) + 16;
-
-              final cards = <Widget>[
-                _StatCard(
-                  icon: Icons.people_alt_rounded,
-                  label: 'Total Alumni',
-                  value: stats.totalAlumni,
-                  accent: _kBrandNavy,
-                ),
-                _StatCard(
+          // ✅ Two stat cards, always side-by-side on every device.
+          // "Total Alumni" was removed — it was redundant with the
+          // Career Overview donut's center total (same number, same
+          // screen).
+          //
+          // ⚠️ `CrossAxisAlignment.start` (not `.stretch`): the parent
+          // sliver gives this Row unbounded height, and stretch would
+          // forward that infinite constraint down to the cards →
+          // "BoxConstraints forces an infinite height". Each card
+          // sizes itself (Column with MainAxisSize.min), so start is
+          // both correct and safe.
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: _StatCard(
                   icon: Icons.school_rounded,
                   label: 'Active Batches',
                   value: stats.activeBatchCount,
                   accent: const Color(0xFF0F766E),
                 ),
-                _StatCard(
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: _StatCard(
                   icon: Icons.location_on_rounded,
                   label: 'Districts',
                   value: stats.districtsCoveredCount,
                   accent: const Color(0xFFB45309),
                 ),
-              ];
-
-              if (fits) {
-                return Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Expanded(child: cards[0]),
-                    const SizedBox(width: 8),
-                    Expanded(child: cards[1]),
-                    const SizedBox(width: 8),
-                    Expanded(child: cards[2]),
-                  ],
-                );
-              }
-
-              return Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: [
-                  SizedBox(
-                    width: (constraints.maxWidth - 8) / 2,
-                    child: cards[0],
-                  ),
-                  SizedBox(
-                    width: (constraints.maxWidth - 8) / 2,
-                    child: cards[1],
-                  ),
-                  SizedBox(
-                    width: (constraints.maxWidth - 8) / 2,
-                    child: cards[2],
-                  ),
-                ],
-              );
-            },
+              ),
+            ],
           ),
           const SizedBox(height: 20),
           CareerStatusDonutChart(
@@ -746,8 +713,7 @@ class _DashboardTabState extends ConsumerState<_DashboardTab> {
 }
 
 // ─────────────────────────────────────────────────────────────────────
-// Circular AppBar icon button — same visual language as before but a
-// slightly tighter 40dp hit target so a two-line title still has room.
+// Circular AppBar icon button
 // ─────────────────────────────────────────────────────────────────────
 class _AppBarIconButton extends StatelessWidget {
   final IconData icon;
@@ -918,7 +884,7 @@ class _StatCard extends StatelessWidget {
         : accent;
 
     return Container(
-      padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 10),
+      padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 12),
       decoration: BoxDecoration(
         color: theme.colorScheme.surfaceContainerHighest,
         borderRadius: BorderRadius.circular(16),
@@ -932,16 +898,16 @@ class _StatCard extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
           Container(
-            width: 34,
-            height: 34,
+            width: 38,
+            height: 38,
             decoration: BoxDecoration(
               color: visibleAccent.withValues(alpha: isDark ? 0.22 : 0.12),
               shape: BoxShape.circle,
             ),
             alignment: Alignment.center,
-            child: Icon(icon, size: 17, color: visibleAccent),
+            child: Icon(icon, size: 19, color: visibleAccent),
           ),
-          const SizedBox(height: 6),
+          const SizedBox(height: 8),
           FittedBox(
             fit: BoxFit.scaleDown,
             child: Text(
